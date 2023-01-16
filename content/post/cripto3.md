@@ -649,27 +649,27 @@ Ya debería funcionar correctamente mi página web desde https.
 #### 6. Instala ahora un servidor nginx, y realiza la misma configuración que anteriormente para que se sirva la página con HTTPS.
 
 ```
-  sudo systemctl disable --now apache2
-  sudo apt install nginx
-  sudo nano /var/www/arantxa.iesgn.org/index.html
+sudo systemctl disable --now apache2
+sudo apt install nginx
+sudo nano /var/www/arantxa.iesgn.org/index.html
 
  server {
       listen 80;
       listen [::]:80;
-      server_name maria.iesgn.org;
+      server_name arantxa.iesgn.org;
       return 301 https://$server_name$request_uri;
   }
 
   server {
       listen 443 ssl http2;
       listen [::]:443 ssl http2;
-      server_name maria.iesgn.org;
+      server_name arantxa.iesgn.org;
 
-      ssl_certificate /etc/ssl/certs/maria.crt;
-      ssl_certificate_key /etc/ssl/private/maria-priv.key;
+      ssl_certificate /etc/ssl/certs/arantxa.crt;
+      ssl_certificate_key /etc/ssl/private/clavearantxa.key;
       ssl_trusted_certificate /etc/ssl/certs/cacert.crt;
 
-      root /var/www/html/maria.iesgn.org;
+      root /var/www/html/arantxa.iesgn.org;
       index index.html;
 
       location / {
