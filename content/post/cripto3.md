@@ -909,6 +909,6 @@ sudo systemctl restart nginx
 
 Compruebo que la web funciona correctamente.
 
-![web-nginx](/img/cripto3/46.png)
+![web-nginx](/img/cripto3/53.png)
 
-![web-nginx2](/img/cripto3/47.png)
+![web-nginx2](/img/cripto3/54.png)
