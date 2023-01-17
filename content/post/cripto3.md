@@ -729,9 +729,12 @@ El alumno que hace de administrador del servidor web, debe entregar una document
 #### 1. Crea una clave privada RSA de 4096 bits para identificar el servidor.
 
 ```
-sudo openssl genrsa -aes256 -out /etc/ssl/private/clavearantxa.key 4096
-sudo chmod 400 /etc/ssl/private/clavearantxa.key
+openssl genrsa -out /etc/ssl/private/clavearantxa.key 4096
+chmod 400 /etc/ssl/private/clavearantxa.key
 ```
+
+![certificado](/img/cripto3/50.png)
+
 
 #### 2. Utiliza la clave anterior para generar un CSR, considerando que deseas acceder al servidor con el FQDN (tunombre.iesgn.org).
 
@@ -744,7 +747,7 @@ openssl req -new -sha256 -key /etc/ssl/private/clavearantxa.key -out arantxa.csr
 
 #### 3. Envía la solicitud de firma a la entidad certificadora (su compañero).
 
-Le envío mi csr (arantxa.csr) a mi compañero.
+Le envío mi csr (arantxa.csr) a mi compañero mediante scp.
 
 ![certificado](/img/cripto3/42.png)
 
@@ -765,12 +768,15 @@ ls -l /home/usuario1/ | egrep '(cacert|arantxa)'
 Para empezar copio los ficheros a /etc/ssl/certs/, cambiamos el usuario al que pertenece y cambiamos los permisos.
 
 ```
-sudo cp /home/usuario1/arantxa.crt /etc/ssl/certs/
-sudo cp /home/usuario1/cacert.pem /etc/ssl/certs/
-sudo chown root:root /etc/ssl/certs/arantxa.crt
-sudo chown root:root /etc/ssl/certs/cacert.pem
-sudo chmod 644 /etc/ssl/certs/arantxa.crt
-sudo chmod 644 /etc/ssl/certs/cacert.pem
+cp /home/usuario1/arantxa.crt /etc/ssl/certs/
+cp /home/usuario1/cacert.pem /etc/ssl/certs/
+
+
+
+chown root:root /etc/ssl/certs/arantxa.crt
+chown root:root /etc/ssl/certs/cacert.pem
+chmod 644 /etc/ssl/certs/arantxa.crt
+chmod 644 /etc/ssl/certs/cacert.pem
 ```
 
 Modificamos el virtualhost para https.
@@ -808,8 +814,8 @@ nano /etc/apache2/sites-available/default-ssl.conf
 Habilito el virualhost para https y el módulo ssl.
 
 ```
-sudo a2ensite default-ssl
-sudo a2enmod ssl
+a2ensite default-ssl
+a2enmod ssl
 ```
 
 Añadimos la redirección al virtualhost y reiniciamos el servicio:
@@ -845,7 +851,7 @@ Tendremos que importar el certificado cacert.pem que nos mandó nuestro compañe
 
 Ya debería funcionar correctamente mi página web desde https.
 
-![web](/img/cripto3/50.png)
+![web](/img/cripto3/58.png)
 
 #### 6. Instala ahora un servidor nginx, y realiza la misma configuración que anteriormente para que se sirva la página con HTTPS.
 
@@ -870,7 +876,7 @@ server {
 
         ssl_certificate    /etc/ssl/certs/arantxa.crt;
         ssl_certificate_key    /etc/ssl/private/clavearantxa.key;
-        ssl_trusted_certificate /etc/ssl/certs/cacert.crt;
+        ssl_trusted_certificate /etc/ssl/certs/cacert.pem;
 
         root /var/www/arantxa.iesgn.org;
         index index.html index.htm index.nginx-debian.html;
@@ -903,12 +909,12 @@ Modifico el html:
 Crear el enlace simbólico y reiniciar servicio nginx:
 
 ```
-sudo ln -s /etc/nginx/sites-available/arantxa.iesgn.org.nginx.conf /etc/nginx/sites-enabled/
-sudo systemctl restart nginx
+ln -s /etc/nginx/sites-available/arantxa.iesgn.org.nginx.conf /etc/nginx/sites-enabled/
+systemctl restart nginx
 ```
 
 Compruebo que la web funciona correctamente.
 
-![web-nginx](/img/cripto3/53.png)
+![web-nginx](/img/cripto3/59.png)
 
-![web-nginx2](/img/cripto3/54.png)
+![web-nginx2](/img/cripto3/60.png)
