@@ -28,7 +28,7 @@ Documenta el proceso detalladamente.
 
 Para empezar he creado el escenario con vagrant. He creado tres máquinas: servidorvpn (192.168.0.3 y 192.168.22.2), cliente1 (192.168.0.2) y aislada (192.168.22.3). Cada uno tendrá una configuración que pasaré a comentar a continuación. El Vagrantfile es el siguiente:
 
-```
+```bash
 Vagrant.configure("2") do |config|
 
 config.vm.synced_folder ".", "/vagrant", disabled: true
@@ -97,7 +97,7 @@ Ejecutar `sudo sysctl -p` para que se active el bit de forwarding.
 
 Vamos a crear el certificado y las claves con Openssl mediante easy-rsa. Para ello vamos a trabajar en el directorio /etc/openvpn. Copiamos aquí easy-rsa.
 
-```
+```bash
 sudo cp -r /usr/share/easy-rsa /etc/openvpn
 
 cd /etc/openvpn/easy-rsa
@@ -105,13 +105,13 @@ cd /etc/openvpn/easy-rsa
 
 Activamos la infraestructura con init-pki:
 
-```
+```bash
 sudo ./easyrsa init-pki
 ```
 
 Creamos el certificado de la **CA** y la clave privada.
 
-```
+```bash
 sudo ./easyrsa build-ca
 ```
 
@@ -121,7 +121,7 @@ El certificado generado **ca.crt** y la clave privada **ca.key** se encuentran e
 
 Ahora creamos el certificado y la clave privada del **servidor VPN**.
 
-```
+```bash
 sudo ./easyrsa build-server-full server nopass
 ```
 
@@ -131,7 +131,7 @@ El certificado es **server.crt** y la clave privada **server.key** (en pki/issue
 
 Creamos los parámetros **Diffie-Helman** para que haya un intercambio seguro entre los nodos (esto tarda un poco en generarse).
 
-```
+```bash
 sudo ./easyrsa gen-dh
 ```
 
@@ -139,7 +139,7 @@ Los parámetros **dh.pem** se crean en el directorio pki/.
 
 A continuación genero el certificado y la clave privada del **cliente** (seguimos en la máquina servidorvpn), los cuales enviaremos mediante scp a la máquina cliente1.
 
-```
+```bash
 sudo ./easyrsa build-client-full clientevpn nopass
 ```
 
@@ -149,7 +149,7 @@ El certificado generado firmado por la clave privada de la CA se llama **cliente
 
 Los enviamos a cliente1 junto con el certificado de la CA.
 
-```
+```bash
 sudo cp -rp /etc/openvpn/easy-rsa/pki/{ca.crt,issued/clientevpn.crt,private/clientevpn.key} /home/vagrant/
 cd
 sudo chown vagrant:vagrant {ca.crt,clientevpn.crt,clientevpn.key}
@@ -160,14 +160,14 @@ scp {ca.crt,clientevpn.crt,clientevpn.key} vagrant@192.168.0.2:.
 
 Creo la configuración del tunel para el servidorvpn. Para ello primero copiamos la configuración por defecto de Openvpn y la modificamos según necesitemos. 
 
-```
+```bash
 sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf /etc/openvpn/server/servidor.conf
 sudo nano /etc/openvpn/server/servidor.conf
 ```
 
 En **server** he puesto el rango de ip virtuales. La máquina servidor-vpn cogerá por defecto la primera, es decir 10.99.99.1. El documento de configuración quedaría de la siguiente forma:
 
-```
+```bash
 port 1194
 
 ;proto tcp
@@ -239,7 +239,7 @@ explicit-exit-notify 1
 
 Iniciamos el servicio openvpn y comprobamos su funcionamiento:
 
-```
+```bash
 sudo systemctl enable --now openvpn-server@servidor
 sudo systemctl status openvpn-server@servidor
 ```
@@ -250,7 +250,7 @@ sudo systemctl status openvpn-server@servidor
 
 Instalamos openvpn y, a continuación, movemos los ficheros que recibimos anteriormente del servidor-vpn al directorio /etc/openvpn/client. Cambiamos el usuario de todos los ficheros a root.
 
-```
+```bash
 sudo apt update
 sudo apt install openvpn
 sudo mv {ca.crt,clientevpn.crt,clientevpn.key} /etc/openvpn/client
@@ -259,12 +259,12 @@ sudo chown root: /etc/openvpn/client/*
 
 Creamos la configuración de openvpn para nuestro cliente.
 
-```
+```bash
 sudo cp /usr/share/doc/openvpn/examples/sample-config-files/client.conf /etc/openvpn/client/cliente.conf
 sudo nano /etc/openvpn/client/cliente.conf
 ```
 
-```
+```bash
 client
 
 ;dev tap
@@ -311,7 +311,7 @@ verb 3
 
 Iniciamos el servicio openvpn y comprobamos su estado.
 
-```
+```bash
 sudo systemctl enable --now openvpn-client@cliente
 sudo systemctl status openvpn-client@cliente
 ```
@@ -322,7 +322,7 @@ sudo systemctl status openvpn-client@cliente
 
 Cambiar la ruta por defecto:
 
-```
+```bash
 sudo ip route del default
 sudo ip route add default via 192.168.22.2
 ```
@@ -358,7 +358,7 @@ Documenta el proceso detalladamente.
 
 Primero voy a crear el escenario. Borro las máquinas anteriores con vagrant destroy y modifico el Vagrantfile, quedando de la siguiente forma:
 
-```
+```bash
 Vagrant.configure("2") do |config|
 
 config.vm.synced_folder ".", "/vagrant", disabled: true
@@ -433,7 +433,7 @@ Hago `vagrant up` y ya tendré mi nuevo escenario montado.
 
 Los primeros pasos serán iguales que en el anterior caso, por lo que no los explicaré:
 
-```
+```bash
 sudo apt update
 sudo apt install openvpn
 sudo nano /etc/sysctl.conf
@@ -458,7 +458,7 @@ A partir de ahora empiezan las diferencias con respecto al caso anterior.
 
 Creo el directorio ccd (client-config-dir), el cual contendrá un fichero llamado **clientevpn** que contendrá la otra red a la que se conecta clientevpn.
 
-```
+```bash
 cd /etc/openvpn
 sudo mkdir ccd
 cd ccd
@@ -469,17 +469,17 @@ iroute 192.168.0.0 255.255.255.0
 
 Como en el apartado anterior voy a copiar el fichero de configuración de ejemplo de openvpn.
 
-```
+```bash
 sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf /etc/openvpn/server/servidor.conf
 ```
 
 Modifico el fichero anterior según mis necesidades. Quedaría de la siguiente forma:
 
-```
+```bash
 sudo nano /etc/openvpn/server/servidor.conf
 ```
 
-```
+```bash
 port 1194
 proto udp
 dev tun
@@ -510,7 +510,7 @@ explicit-exit-notify 1
 
 Iniciamos el servidor y comprobamos que funcione.
 
-```
+```bash
 sudo systemctl enable --now openvpn-server@servidor
 sudo systemctl status openvpn-server@servidor
 ```
@@ -521,14 +521,14 @@ sudo systemctl status openvpn-server@servidor
 
 Actualizamos e instalamos openvpn.
 
-```
+```bash
 sudo apt update
 sudo apt install openvpn
 ```
 
 Activamos el bit de forwarding.
 
-```
+```bash
 sudo nano /etc/sysctl.conf
 
 net.ipv4.ip_forward=1
@@ -538,20 +538,20 @@ sudo sysctl -p
 
 Movemos a /etc/openvpn/client los ficheros que habíamos pasado anteriormente desde el servidor.
 
-```
+```bash
 sudo mv {ca.crt,clientevpn.crt,clientevpn.key} /etc/openvpn/client
 sudo chown root:root /etc/openvpn/client/*
 ```
 
 Y creamos el fichero de configuración para el cliente VPN.
 
-```
+```bash
 sudo cp /usr/share/doc/openvpn/examples/sample-config-files/client.conf /etc/openvpn/client/cliente.conf
 
 sudo nano /etc/openvpn/client/cliente.conf
 ```
 
-```
+```bash
 client
 dev tun
 proto udp
@@ -574,7 +574,7 @@ verb 3
 
 Habilitamos el servicio y comprobamos que funciona correctamente.
 
-```
+```bash
 sudo systemctl enable --now openvpn-client@cliente
 sudo systemctl status openvpn-client@cliente
 ```
@@ -583,7 +583,7 @@ sudo systemctl status openvpn-client@cliente
 
 **En *cliente1*:**
 
-```
+```bash
 sudo ip route del default
 sudo ip route add default via 192.168.0.1
 ```
@@ -592,7 +592,7 @@ sudo ip route add default via 192.168.0.1
 
 **En *cliente2*:**
 
-```
+```bash
 sudo ip route del default
 sudo ip route add default via 192.168.20.1
 ```
