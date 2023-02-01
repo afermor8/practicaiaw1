@@ -16,11 +16,11 @@ bigimg: [{src: "/img/triangle.jpg", desc: "Triangle"}, {src: "/img/sphere.jpg", 
 
 Configura una conexión VPN de acceso remoto entre dos equipos del cloud:
 
-- Uno de los dos equipos (el que actuará como servidor) estará conectado a dos redes 
-- Para la autenticación de los extremos se usarán obligatoriamente certificados digitales, que se generarán utilizando openssl y se almacenarán en el directorio /etc/openvpn, junto con  los parámetros Diffie-Helman y el certificado de la propia Autoridad de Certificación. 
-- Se utilizarán direcciones de la red 10.99.99.0/24 para las direcciones virtuales de la VPN. La dirección 10.99.99.1 se asignará al servidor VPN. 
-- Los ficheros de configuración del servidor y del cliente se crearán en el directorio /etc/openvpn de cada máquina, y se llamarán servidor.conf y cliente.conf respectivamente. 
-- Tras el establecimiento de la VPN, la máquina cliente debe ser capaz de acceder a una máquina que esté en la otra red a la que está conectado el servidor. 
+- Uno de los dos equipos (el que actuará como servidor) estará conectado a dos redes.
+- Para la autenticación de los extremos se usarán obligatoriamente certificados digitales, que se generarán utilizando openssl y se almacenarán en el directorio /etc/openvpn, junto con  los parámetros Diffie-Helman y el certificado de la propia Autoridad de Certificación.
+- Se utilizarán direcciones de la red 10.99.99.0/24 para las direcciones virtuales de la VPN. La dirección 10.99.99.1 se asignará al servidor VPN.
+- Los ficheros de configuración del servidor y del cliente se crearán en el directorio /etc/openvpn de cada máquina, y se llamarán servidor.conf y cliente.conf respectivamente.
+- Tras el establecimiento de la VPN, la máquina cliente debe ser capaz de acceder a una máquina que esté en la otra red a la que está conectado el servidor.
 
 Documenta el proceso detalladamente.
 
@@ -158,7 +158,7 @@ scp {ca.crt,clientevpn.crt,clientevpn.key} vagrant@192.168.0.2:.
 
 ![instancias](/img/vpn/5.png)
 
-Creo la configuración del tunel para el servidorvpn. Para ello primero copiamos la configuración por defecto de Openvpn y la modificamos según necesitemos. 
+Creo la configuración del tunel para el servidorvpn. Para ello primero copiamos la configuración por defecto de Openvpn y la modificamos según necesitemos.
 
 ```bash
 sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf /etc/openvpn/server/servidor.conf
@@ -340,7 +340,6 @@ Hacemos ping y traceroute al otro extremo del tunel (10.99.99.1).
 Hacemos ping y traceroute desde la máquina cliente1 a la máquina **aislada** (192.168.22.3).
 
 ![prueba](/img/vpn/prueba3.png)
-
 
 -------------------------
 
@@ -613,7 +612,6 @@ Hacemos ping y traceroute desde cliente2 a cliente1 (192.168.0.2).
 
 ![prueba](/img/vpn/prueba7.png)
 
-
 -------------------------
 
 ### C) VPN de acceso remoto con WireGuard (5 puntos)
@@ -622,7 +620,7 @@ Monta una VPN de acceso remoto usando Wireguard. Intenta probarla con clientes W
 
 -------------------------
 
-#### Desde cliente Debian 11:
+#### Desde cliente Debian 11
 
 Primero creo el escenario para hacerlo desde un cliente Debian 11, que será el siguiente:
 
@@ -852,8 +850,7 @@ traceroute 10.99.99.2
 
 ![prueba](/img/vpn/19.png)
 
-
-#### Desde *Windows 10*:
+#### Desde *Windows 10*
 
 Iniciamos la máquina y lo primero que haremos es instalar Wireguard desde la [página oficial](https://www.wireguard.com/install/).
 
@@ -935,8 +932,7 @@ Hacemos ping y tracert desde Windows a la máquina **aislada**.
 
 ![prueba](/img/vpn/.png)
 
-
-#### Desde *Android*:
+#### Desde *Android*
 
 En este caso voy a utilizar mi teléfono móvil Android (192.168.1.130) conectado a mi máquina host (192.168.1.248) para crear un túnel y poderme conectar a una máquina llamada aislada (192.168.121.12) que está conectada a mi host (192.168.121.1).
 
@@ -1051,16 +1047,243 @@ Hacemos ping y traceroute a la máquina aislada (192.168.121.12).
 
 Configura una VPN sitio a sitio usando WireGuard. Documenta el proceso adecuadamente y compáralo con el del apartado B.
 
+-------------------------
 
+Creo mi escenario.
 
+```bash
+Vagrant.configure("2") do |config|
+
+config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider :libvirt do |libvirt|
+    libvirt.cpus = 1
+    libvirt.memory = 512
+  end
+
+  config.vm.define :cliente1 do |cliente1|
+    cliente1.vm.box = "debian/bullseye64"
+    cliente1.vm.hostname = "cliente1"
+    cliente1.vm.network :private_network,
+      :libvirt__network_name => "privada1",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.0.2",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+  end
+
+  config.vm.define :clientevpn do |clientevpn|
+    clientevpn.vm.box = "debian/bullseye64"
+    clientevpn.vm.hostname = "clientevpn"
+    clientevpn.vm.network :private_network,
+      :libvirt__network_name => "privada1",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.0.1",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+    clientevpn.vm.network :private_network,
+      :libvirt__network_name => "externa",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.10.1",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+  end
+
+  config.vm.define :servervpn do |servervpn|
+    servervpn.vm.box = "debian/bullseye64"
+    servervpn.vm.hostname = "servervpn"
+    servervpn.vm.network :private_network,
+      :libvirt__network_name => "externa",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.10.2",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+    servervpn.vm.network :private_network,
+      :libvirt__network_name => "privada2",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.20.1",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+  end
+
+  config.vm.define :cliente2 do |cliente2|
+    cliente2.vm.box = "debian/bullseye64"
+    cliente2.vm.hostname = "cliente2"
+    cliente2.vm.network :private_network,
+      :libvirt__network_name => "privada2",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.20.2",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+  end
+
+end
+```
+
+**En *servervpn*:**
+
+Instalamos Wireguard y creamos el par de claves:
+
+```bash
+sudo apt update
+sudo apt install wireguard
+sudo su
+cd /etc/wireguard/
+wg genkey | tee serverprivatekey | wg pubkey > serverpublickey
+```
+
+Creamos el fichero de configuración (en la opción 'PrivateKey' debemos copiar la clave privada generada anteriormente).
+
+```bash
+cat serverprivatekey
+nano wg0.conf
+```
+
+```bash
+# Server config
+[Interface]
+Address = 10.99.99.1
+PrivateKey = sKwLpKSnuc2a99wQuWNIVC1zlXoawS/Q1we/enoAlFU=
+ListenPort = 51820
+# IP forwarding
+PreUp = sysctl -w net.ipv4.ip_forward=1
+
+#iptables rules
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o wlp3s0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o wlp3s0 -j MASQUERADE
+```
+
+Modificamos los permisos por seguridad.
+
+```bash
+chmod 600 /etc/wireguard/ -R
+```
+
+Avtivamos la interfaz creada y comprobamos que funciona.
+
+```bash
+wg-quick up wg0
+wg
+ip -br a
+```
+
+![prueba](/img/vpn/37.png)
+
+**En *clientevpn*:**
+
+Instalamos Wireguard y creamos el par de claves:
+
+```bash
+sudo apt update
+sudo apt install wireguard
+sudo su
+cd /etc/wireguard/
+wg genkey | tee serverprivatekey | wg pubkey > serverpublickey
+```
+
+Creamos el fichero de configuración (en la opción 'PrivateKey' debemos copiar la clave privada generada anteriormente).
+
+```bash
+cat serverprivatekey
+nano wg0.conf
+```
+
+```bash
+# Server config
+[Interface]
+Address = 10.99.99.2
+PrivateKey = mIbxPUe7OEmOPxLTiDV7NOPDBOFn8TwKn3ydrwU3OFA=
+ListenPort = 51820
+# IP forwarding
+PreUp = sysctl -w net.ipv4.ip_forward=1
+
+#iptables rules
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o wlp3s0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o wlp3s0 -j MASQUERADE
+
+[Peer]
+Endpoint = 192.168.10.2:51820
+AllowedIPs = 10.99.99.1/32, 192.168.20.0/24
+PublicKey = kZ6g7uh5hT56zRQfnzxEzESYjiqXhH/sHKVGJIuahkU=
+```
+
+Modificamos los permisos por seguridad.
+
+```bash
+chmod 600 /etc/wireguard/ -R
+```
+
+Avtivamos la interfaz creada y comprobamos que funciona.
+
+```bash
+wg-quick up wg0
+wg
+ip -br a
+```
+
+![prueba](/img/vpn/38.png)
+
+Volvemos a **servervpn** y añadimos al fichero de configuración lo siguiente:
+
+```bash
+[Peer]
+Endpoint = 192.168.10.1:51820
+AllowedIPs = 10.99.99.2/32, 192.168.0.0/24
+PublicKey = SWxKNObvpaunCOUg+HNxgd9UHxBQEIl02Q5vZJIWI0Y=
+```
+
+Reiniciamos.
+
+```bash
+wg-quick down wg0
+wg-quick up wg0
+wg
+ip -br a
+```
+
+![prueba](/img/vpn/39.png)
+
+**En *cliente1*:**
+
+Cambiamos la ruta por defecto.
+
+```bash
+sudo ip route del default
+sudo ip route add default via 192.168.0.1
+```
+
+![prueba](/img/vpn/40.png)
+
+**En *cliente2*:**
+
+Cambiamos la ruta por defecto.
+
+```bash
+sudo ip route del default
+sudo ip route add default via 192.168.20.1
+```
+
+![prueba](/img/vpn/41.png)
+
+**Comprobación:**
+
+Hacemos ping y traceroute desde **clientevpn** al otro extremo del túnel:
+
+![prueba](/img/vpn/42.png)
+
+Hacemos ping y traceroute desde **cliente1** a **cliente2**:
+
+![prueba](/img/vpn/43.png)
+
+Hacemos ping y traceroute desde **cliente2** a **cliente1**:
+
+![prueba](/img/vpn/44.png)
 
 -------------------------
 
 ### Extra 1) VPN de acceso remoto con Ipsec (5 puntos)
 
 Elige una aplicación por software (por ejemplo, FreeS/Wan) y monta la configuración. Documenta el proceso detalladamente.
-
-
 
 -------------------------
 
