@@ -620,10 +620,430 @@ Hacemos ping y traceroute desde cliente2 a cliente1 (192.168.0.2).
 
 Monta una VPN de acceso remoto usando Wireguard. Intenta probarla con clientes Windows, Linux y Android. Documenta el proceso adecuadamente y compáralo con el del apartado A.
 
+-------------------------
+
+#### Desde cliente Debian 11:
+
+Primero creo el escenario para hacerlo desde un cliente Debian 11, que será el siguiente:
+
+```bash
+Vagrant.configure("2") do |config|
+
+config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider :libvirt do |libvirt|
+    libvirt.cpus = 1
+    libvirt.memory = 512
+  end
+
+  config.vm.define :clientelx do |clientelx|
+    clientelx.vm.box = "debian/bullseye64"
+    clientelx.vm.hostname = "clientelx"
+    clientelx.vm.network :private_network,
+      :libvirt__network_name => "redexterna",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.50.2",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+  end
+
+  config.vm.define :servervpn do |servervpn|
+    servervpn.vm.box = "debian/bullseye64"
+    servervpn.vm.hostname = "servervpn"
+    servervpn.vm.network :private_network,
+      :libvirt__network_name => "redexterna",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.50.1",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+    servervpn.vm.network :private_network,
+      :libvirt__network_name => "redinterna",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.80.1",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+  end
+
+  config.vm.define :aislada do |aislada|
+    aislada.vm.box = "debian/bullseye64"
+    aislada.vm.hostname = "aislada"
+    aislada.vm.network :private_network,
+      :libvirt__network_name => "redinterna",
+      :libvirt__dhcp_enabled => false,
+      :ip => "192.168.80.2",
+      :libvirt__netmask => '255.255.255.0',
+      :libvirt__forward_mode => "veryisolated"
+  end
+
+end
+```
+
+**En *servervpn*:**
+
+Instalamos Wireguard.
+
+```bash
+sudo apt update
+sudo apt install wireguard
+```
+
+En este caso no activaremos el bit de forwarding manualmente ya que lo haremos directamente desde el fichero de configuración de Wireguard.
+
+Generamos el par de claves en **/etc/wireguard/**.
+
+```bash
+sudo su
+cd /etc/wireguard/
+wg genkey | tee serverprivatekey | wg pubkey > serverpublickey
+```
+
+Creamos el fichero de configuración (en la opción 'PrivateKey' debemos copiar la clave privada generada anteriormente).
+
+```bash
+cat serverprivatekey
+nano wg0.conf
+```
+
+```bash
+# Server config
+[Interface]
+Address = 10.99.99.1
+PrivateKey = yG48lnvU/+blnbVOSmIDz5yyDRsGAFmCqLSxQRous2Q=
+ListenPort = 51820
+# IP forwarding
+PreUp = sysctl -w net.ipv4.ip_forward=1
+
+#iptables rules
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o wlp3s0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o wlp3s0 -j MASQUERADE
+```
+
+Modificamos los permisos por seguridad.
+
+```bash
+chmod 600 /etc/wireguard/ -R
+```
+
+Avtivamos la interfaz creada y comprobamos que funciona.
+
+```bash
+wg-quick up wg0
+wg
+ip -br a
+```
+
+![prueba](/img/vpn/13.png)
+
+**En *clientelx*:**
+
+Instalo Wireguard y creo el par de claves en /etc/wireguard.
+
+```bash
+sudo apt update
+sudo apt install wireguard
+sudo su
+cd /etc/wireguard
+wg genkey | tee clientprivatekey | wg pubkey > clientpublickey
+```
+
+Creo el fichero de configuración.
+
+```bash
+cat clientprivatekey
+cat clientpublickey 
+nano wg0.conf
+
+[Interface]
+Address = 10.99.99.2
+PrivateKey = 4HH9loDo2Bj90nYw4ZlKOGeWS0Bk9lLa/Aw/jSnuSFU=
+ListenPort = 51820
+PostUp = ip route add 192.168.80.0/24 dev wg0
+PostDown = ip route del 192.168.80.0/24 dev wg0
+
+[Peer]
+PublicKey = p/Fg6cK6MPh76HWi7B0dj44ISBJjb8D263a8b5cSQ18=
+AllowedIPs = 0.0.0.0/0
+Endpoint = 192.168.50.1:51820
+PersistentKeepalive = 25
+```
+
+En PrivateKey copio la clave privada del cliente con `cat clientprivatekey`.
+
+En Postup y Postdown habrá que poner la red interna a la que nos conectaremos.
+
+En Endpoint tendremos que poner la IP del servidor Wireguard (servervpn), el que configuramos en el punto anterior, y en PublicKey voy a copiar la **clave pública** de **servervpn** con `cat clientpublickey`.
+
+Cambiamos los permisos.
+
+```bash
+chmod 600 /etc/wireguard/ -R
+```
+
+Ahora activamos la interfaz y comprobamos que funciona.
+
+```bash
+wg-quick up wg0
+ip -br a
+```
+
+![prueba](/img/vpn/13.png)
+
+Por último, añadimos **en servervpn** el bloque Peer del cliente que acabamos de configurar. Añadimos al fichero de configuración **wg0.conf** lo siguiente:
+
+```bash
+# Cliente Debian 11
+
+[Peer]
+Publickey = Xs2GEu0honQOS3clIjosaLUa7D0VwnrbSTIALr7cvk4=
+AllowedIPs = 10.99.99.2/32
+PersistentKeepAlive = 25
+```
+
+En Publickey hay que poner la clave pública del cliente.
+
+Reiniciamos el servicio y comprobamos que funciona.
+
+```bash
+wg-quick down wg0
+wg-quick up wg0
+wg
+ip r
+```
+
+![prueba](/img/vpn/15.png)
+
+**En *aislada*:**
+
+Cambiamos la ruta por defecto en la máquina aislada.
+
+```bash
+sudo ip r del default
+sudo ip r add default via 192.168.80.1
+```
+
+![prueba](/img/vpn/17.png)
+
+**Comprobación:**
+
+Volvemos a la máquina **clientelx** y probamos que se puede hacer ping y traceroute a la máquina **aislada** de la red interna.
+
+```bash
+ping 192.168.80.2
+traceroute 192.168.80.2
+```
+
+![prueba](/img/vpn/18.png)
+
+Hacemos ping y traceroute desde **clientelx** al otro extremo del túnel.
+
+```bash
+ping 10.99.99.1
+traceroute 10.99.99.1
+```
+
+![prueba](/img/vpn/20.png)
+
+Hacemos ping y traceroute desde la máquina **aislada** de la red interna a la interfaz del túnel del cliente externo.
+
+```bash
+ping 10.99.99.2
+traceroute 10.99.99.2
+```
+
+![prueba](/img/vpn/19.png)
 
 
+#### Desde *Windows 10*:
+
+Iniciamos la máquina y lo primero que haremos es instalar Wireguard desde la [página oficial](https://www.wireguard.com/install/).
+
+![prueba](/img/vpn/24.png)
+
+Ahora conectamos la máquina Windows 10 a la red **redexterna** creada anteriormente.
+
+![prueba](/img/vpn/21.png)
+
+En Símbolo del sistema (como administrador) configuramos la interfaz de forma estática.
+
+```bash
+netsh interface ip set address name="Ethernet" static 192.168.50.3 255.255.255.0 192.168.50.1
+```
+
+Compruebo la configuración y si tenemos conectividad.
+
+![prueba](/img/vpn/22.png)
+![prueba](/img/vpn/23.png)
+
+Iniciamos el programa y creamos un túnel vacío.
+
+![prueba](/img/vpn/25.png)
+
+Se generan las claves de forma automática.
+
+![prueba](/img/vpn/26.png)
+
+Completamos la configuración.
+
+![prueba](/img/vpn/27.png)
+
+Ya nos aparecerá el tunel creado en el programa Wireguard.
+
+![prueba](/img/vpn/28.png)
+
+**En *servervpn*:**
+
+A continuación vamos a la máquina servervpn y añadimos al fichero wg0.conf lo siguiente.
+
+```bash
+#Cliente Windows 10
+
+[Peer]
+PublicKey = p9xaV3uyUxqq89E79sgdj52AGcapJ+D4GqMJn/ZI31g=
+AllowedIPs = 10.99.99.3/32
+PersistentKeepAlive = 25
+```
+
+Reiniciamos wireguard.
+
+```bash
+wg-quick down wg0
+wg-quick up wg0
+wg
+```
+
+![prueba](/img/vpn/29.png)
+
+**Volvemos al cliente Windows 10:**
+
+Activamos el túnel que creamos anteriormente.
+
+![prueba](/img/vpn/30.png)
+
+![prueba](/img/vpn/31.png)
+
+Comprobamos que se nos ha creado la interfaz del túnel.
+
+![prueba](/img/vpn/32.png)
+
+**Comprobación:**
+
+Hacemos ping y tracert desde Windows al otro extremo del túnel:
+
+![prueba](/img/vpn/.png)
+
+Hacemos ping y tracert desde Windows a la máquina **aislada**.
+
+![prueba](/img/vpn/.png)
 
 
+#### Desde *Android*:
+
+En este caso voy a utilizar mi teléfono móvil Android (192.168.1.130) conectado a mi máquina host (192.168.1.248) para crear un túnel y poderme conectar a una máquina llamada aislada (192.168.121.12) que está conectada a mi host (192.168.121.1).
+
+Para hacer esto primero tendremos que configurar mi host con wireguard como hicimos en el primer caso.
+
+Instalamos Wireguard y generamos el par de claves.
+
+```bash
+sudo apt install wireguard
+sudo su
+cd /etc/wireguard/
+wg genkey | tee serverprivatekey | wg pubkey > serverpublickey
+```
+
+Creamos el fichero de configuración.
+
+```bash
+cat serverprivatekey
+nano wg0.conf
+```
+
+```bash
+# Server config
+[Interface]
+Address = 10.99.99.1
+PrivateKey = mPGSoAZLQZg/B4Dqy3htpv4sMJgUIiZBSYaNandPA0A=
+ListenPort = 51820
+# IP forwarding
+PreUp = sysctl -w net.ipv4.ip_forward=1
+
+#iptables rules
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o wlp3s0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o wlp3s0 -j MASQUERADE
+```
+
+Modificamos los permisos.
+
+```bash
+chmod 600 /etc/wireguard/ -R
+```
+
+Avtivamos la interfaz creada y comprobamos que funciona.
+
+```bash
+wg-quick up wg0
+wg
+ip -br a
+```
+
+![prueba](/img/vpn/35.png)
+
+Vamos ahora al teléfono Android y descargamos Wireguard.
+
+![prueba](/img/vpn/movil1.jpeg)
+
+Para crear el túnel vamos a usar la opción de crear desde cero.
+
+![prueba](/img/vpn/movil2.jpeg)
+
+Generamos el par de claves y completamos la configuración.
+
+![prueba](/img/vpn/movil3.jpeg)
+
+![prueba](/img/vpn/movil4.jpeg)
+
+![prueba](/img/vpn/movil5.jpeg)
+
+![prueba](/img/vpn/movil6.jpeg)
+
+En la captura anterior me faltó poner el puerto, pero en la siguiente se ve correctamente creado.
+
+![prueba](/img/vpn/movil7.jpeg)
+
+Vamos a nuestro host y modificamos el fichero de configuración wg0.conf. Añadimos lo siguiente:
+
+```bash
+# Cliente Android
+[Peer]
+PublicKey = bwYcPk16D5PLJL1yf82J/BiaS0aVTIt+fVUgUNrPkkE=
+AllowedIPs = 10.99.99.2/32
+```
+
+Reiniciamos el servidor vpn.
+
+```bash
+wg-quick down wg0
+wg-quick up wg0
+wg
+```
+
+![prueba](/img/vpn/36.png)
+
+Ahora sí vamos a nuestro teléfono y activamos el túnel creado.
+
+![prueba](/img/vpn/movil8.jpeg)
+
+Con Terminal Emulator comprobamos que se ha creado el túnel.
+
+**Comprobación:**
+
+Hacemos ping y traceroute al otro extremo del túnel (10.99.99.1).
+
+![prueba](/img/vpn/.png)
+
+Hacemos ping y traceroute a la máquina aislada (192.168.121.12).
+
+![prueba](/img/vpn/.png)
 
 -------------------------
 
