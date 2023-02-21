@@ -788,9 +788,243 @@ DROP TABLE test_tab
 
 Podemos comprobar que en las acciones que se llevaron a cabo con la configuración 'DB' no tienen registros tanto en SQL_BIND como en SQL_TEXT. Sin embargo, en las últimas acciones llevadas a cabo por el usuario audit_test con la configuración 'DB,EXTENDED' sí se han registrado datos en SQL_TEXT.
 
+> [Información interesante sobre Auditoría en Oracle](https://oracle-base.com/articles/10g/auditing-10gr2)
+
 ## 7. Averigua si en Postgres se pueden realizar los cuatro primeros apartados. Si es así, documenta el proceso adecuadamente.
 
+Las auditorías como tal no funcionan igual en PostgreSQL a como son en Oracle, pero hay diferentes formas de obtener la información de lo que se pide en los siguientes apartados.
+
+**a) Activar auditoría de intentos de acceso exitosos al sistema.**
+
+Sí se puede obtener información sobre los intentos de acceso exitosos o fallidos a la base de datos. Para ello, se debe configurar el parámetro "log_connections" en el archivo postgresql.conf poniéndolo en 'on'.
+
+Log_connections hace que se registre cada intento de conexión al servidor, así como la finalización exitosa de la autenticación del cliente (si es necesario) y la autorización. Solo los superusuarios y los usuarios con el privilegio SET apropiado pueden cambiar este parámetro al inicio de la sesión y no se puede cambiar en absoluto dentro de una sesión. El valor por defecto es off.
+
+```bash
+sudo nano /etc/postgresql/13/main/postgresql.conf
+
+...
+log_connections = on
+...
+```
+
+Reiniciamos postgresql.
+
+```bash
+sudo systemctl restart postgresql
+```
+
+Cuando se activa este parámetro, PostgreSQL registra en el archivo de registro de eventos (/var/log/postgresql/postgresql-13-main.log) todas las conexiones exitosas al servidor.
+
+Nos conectamos en la base de datos con el usuario postgres.
+
+```bash
+sudo su postgres
+psql
+```
+
+Hacemos también un intento de acceso con un usuario que no existe y comprobamos el archivo de registro log para comprobar los accesos.
+
+```bash
+sudo cat /var/log/postgresql/postgresql-13-main.log
+```
+
+```txt
+...
+2023-02-21 13:18:15.563 CET [5540] [desconocido]@[desconocido] LOG:  conexión recibida: host=[local]
+2023-02-21 13:18:16.088 CET [5543] [desconocido]@[desconocido] LOG:  conexión recibida: host=[local]
+2023-02-21 13:18:16.090 CET [5543] postgres@template1 LOG:  conexión autorizada: usuario=postgres base_de_datos=template1 nombre_de_aplicación=psql
+2023-02-21 13:18:16.633 CET [5546] [desconocido]@[desconocido] LOG:  conexión recibida: host=[local]
+2023-02-21 13:18:16.636 CET [5546] postgres@template1 LOG:  conexión autorizada: usuario=postgres base_de_datos=template1 nombre_de_aplicación=psql
+2023-02-21 13:18:17.162 CET [5549] [desconocido]@[desconocido] LOG:  conexión recibida: host=[local]
+2023-02-21 13:18:17.163 CET [5549] postgres@template1 LOG:  conexión autorizada: usuario=postgres base_de_datos=template1 nombre_de_aplicación=psql
+2023-02-21 13:18:26.884 CET [5562] [desconocido]@[desconocido] LOG:  conexión recibida: host=[local]
+2023-02-21 13:18:26.884 CET [5562] postgres@postgres LOG:  conexión autorizada: usuario=postgres base_de_datos=postgres nombre_de_aplicación=psql
+2023-02-21 13:22:42.909 CET [5589] [desconocido]@[desconocido] LOG:  conexión recibida: host=[local]
+2023-02-21 13:22:42.910 CET [5589] usuario@usuario FATAL:  la autentificación password falló para el usuario <<usuario>>
+2023-02-21 13:22:42.910 CET [5589] usuario@usuario DETALLE:  No existe el rol <<usuario>>.
+	La conexión coincidió con la línea 94 de pg_hba.conf: <<local   all             all                         md5>>
+2023-02-21 13:22:42.910 CET [5589] usuario@usuario LOG:  could not send data to client: Tubería rota
+2023-02-21 13:22:45.110 CET [5591] [desconocido]@[desconocido] LOG:  conexión recibida: host=[local]
+2023-02-21 13:22:45.112 CET [5591] usuario@usuario FATAL:  la autentificación password falló para el usuario <<usuario>>
+2023-02-21 13:22:45.112 CET [5591] usuario@usuario DETALLE:  No existe el rol <<usuario>>.
+	La conexión coincidió con la línea 94 de pg_hba.conf: <<local   all             all                                     md5>>
+```
+
+**b) Realizar un procedimiento que muestre los accesos fallidos junto con el motivo de los mismos, transformando el código de error almacenado en un mensaje de texto comprensible.**
+
+He intentado realizar una función o procedimiento que utilizando la función pg_read_file de PostgreSQL lea el archivo de registro '/var/log/postgresql/postgresql-13-main.log' y extraiga la información de los intentos de accesos fallidos, pero no he conseguido hacer que funcione.
+
+**c) Activar la auditoría de las operaciones DML realizadas por un usuario concreto.**
+
+Para poder auditar las operaciones DML realizadas por un usuario se puede activar el parámetro log_statement del fichero de configuración postgresql.conf. Este parámetro admite las opciones:
+
+- none. Valor por defecto en el que no captura ninguna operación.
+- ddl. Captura todas las operaciones de definición de datos.
+- mod. Lo mismo que ddl pero también registra los inserts, updates y deletes.
+- all. Registra todas las sentencias contra la base de datos. Cuando se necesita auditar un sistema es la opción que se suele utilizar.
+
+Con el parámetro log_statement se captura absolutamente todo si lo ponemos a all, el problema es que al recoger demasiada información puede ser complicado filtrarla y encontrar lo que buscamos.
+
+Otra forma de auditar sería creando triggers personalizados. Utilizando las opciones before o after podemos auditar las operaciones en una tabla en concreto. Los triggers permiten personalizar mucho la información que capturamos pero hay que mantenerlos según las estructuras de las tablas que cambian.
+
+Para solventar estos problemas se suele utilizar otras herramientas o extensiones. En mi caso voy a utilizar la extensión Audit-trigger.
+
+Primero lo descargamos.
+
+```bash
+wget https://raw.githubusercontent.com/2ndQuadrant/audit-trigger/master/audit.sql
+```
+
+Activamos la herramienta en PostgreSQL.
+
+```bash
+\i audit.sql
+```
+
+Para ver las operaciones DML de un usuario concreto habrá que ir activando esta herramienta tabla por tabla, de la siguiente forma:
+
+```sql
+select audit.audit_table('pelicula');
+select audit.audit_table('actor');
+select audit.audit_table('pelicula_actor');
+```
+
+Resultado:
+
+```sql
+maravilla=# select audit.audit_table('pelicula');
+NOTICE:  disparador \u00abaudit_trigger_row\u00bb para la relaci\u00f3n \u00abpelicula\u00bb no existe, omitiendo
+NOTICE:  disparador \u00abaudit_trigger_stm\u00bb para la relaci\u00f3n \u00abpelicula\u00bb no existe, omitiendo
+NOTICE:  CREATE TRIGGER audit_trigger_row AFTER INSERT OR UPDATE OR DELETE ON pelicula FOR EACH ROW EXECUTE PROCEDURE audit.if_modified_func('true');
+NOTICE:  CREATE TRIGGER audit_trigger_stm AFTER TRUNCATE ON pelicula FOR EACH STATEMENT EXECUTE PROCEDURE audit.if_modified_func('true');
+ audit_table 
+-------------
+ 
+(1 fila)
+
+maravilla=# select audit.audit_table('actor');
+select audit.audit_table('pelicula_actor');
+NOTICE:  disparador \u00abaudit_trigger_row\u00bb para la relaci\u00f3n \u00abactor\u00bb no existe, omitiendo
+NOTICE:  disparador \u00abaudit_trigger_stm\u00bb para la relaci\u00f3n \u00abactor\u00bb no existe, omitiendo
+NOTICE:  CREATE TRIGGER audit_trigger_row AFTER INSERT OR UPDATE OR DELETE ON actor FOR EACH ROW EXECUTE PROCEDURE audit.if_modified_func('true');
+NOTICE:  CREATE TRIGGER audit_trigger_stm AFTER TRUNCATE ON actor FOR EACH STATEMENT EXECUTE PROCEDURE audit.if_modified_func('true');
+ audit_table 
+-------------
+ 
+(1 fila)
+
+NOTICE:  disparador \u00abaudit_trigger_row\u00bb para la relaci\u00f3n \u00abpelicula_actor\u00bb no existe, omitiendo
+NOTICE:  disparador \u00abaudit_trigger_stm\u00bb para la relaci\u00f3n \u00abpelicula_actor\u00bb no existe, omitiendo
+NOTICE:  CREATE TRIGGER audit_trigger_row AFTER INSERT OR UPDATE OR DELETE ON pelicula_actor FOR EACH ROW EXECUTE PROCEDURE audit.if_modified_func('true');
+NOTICE:  CREATE TRIGGER audit_trigger_stm AFTER TRUNCATE ON pelicula_actor FOR EACH STATEMENT EXECUTE PROCEDURE audit.if_modified_func('true');
+ audit_table 
+-------------
+ 
+(1 fila)
+```
+
+Realizamos algunas operaciones con las tablas y sus datos:
+
+```sql
+insert into pelicula (codigo,titulo) values ('MA012','Antman Quantumania');
+update pelicula set puntuacion = 8 where codigo='MA012';
+```
+
+Y comprobamos que se han registrado los movimientos:
+
+```sql
+select session_user_name, action, table_name, action_tstamp_clk, client_query from audit.logged_actions;
+```
+
+Resultado de la comprobación:
+
+```sql
+ session_user_name | action | table_name |       action_tstamp_clk       |                                client_query                                 
+-------------------+--------+------------+-------------------------------+-----------------------------------------------------------------------------
+ postgres          | I      | pelicula   | 2023-02-21 18:15:29.407968+01 | insert into pelicula (codigo,titulo) values ('MA012','Antman Quantumania');
+ postgres          | U      | pelicula   | 2023-02-21 18:16:25.382631+01 | update pelicula set puntuacion = 8 where codigo='MA012';
+(2 filas)
+```
+
+**d) Realizar una auditoría de grano fino para almacenar información sobre la inserción de empleados con sueldo superior a 2000 en la tabla emp del usuario scott.**
+
+Para hacer esto, la única opción que he encontrado sería utilizar triggers, que permitan la ejecución de código automáticamente en respuesta a ciertos eventos en las tablas de la base de datos. Por ejemplo, crear un trigger para la tabla "emp", para auditar y almacenar información específica sobre la inserción de empleados con sueldo superior a 2000.
+
 ## 8. Averigua si en MySQL se pueden realizar los apartados 1, 3 y 4. Si es así, documenta el proceso adecuadamente.
+
+**1) Activar auditoría de intentos de acceso exitosos al sistema.**
+
+MySQL no ofrece una opción nativa para auditar los intentos de acceso exitosos al sistema. Sin embargo, se puede utilizar lo registros de errores del servidor MySQL para ver los intentos de acceso fallidos.
+
+Para ver el registro de errores lo hacemos del siguiente modo:
+
+```bash
+sudo cat /var/log/mysql/error.log
+```
+
+**3) Activar la auditoría de las operaciones DML realizadas por un usuario concreto.**
+
+No existe una opción en MySQL, pero podemos hacerlo con triggers. A continuación veremos un ejemplo.
+
+Primero creamos una base de datos para las auditorías, y creamos una tabla para la salida del trigger.
+
+```sql
+create database auditoria;
+use auditoria;
+
+CREATE TABLE accesos
+ (
+   codigo int(11) NOT NULL AUTO_INCREMENT,
+   usuario varchar(100),
+   fecha datetime,
+   PRIMARY KEY (codigo)
+ )
+ ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
+```
+
+Creamos el trigger.
+
+```sql
+delimiter $$
+CREATE TRIGGER maravilla.admin
+BEFORE INSERT ON maravilla.pelicula
+FOR EACH ROW
+BEGIN
+INSERT INTO auditoria.accesos (usuario, fecha)
+values (CURRENT_USER(), NOW());
+END$$
+```
+
+Entro en mi base de datos llamada maravilla e inserto un registro en la tabla pelicula.
+
+```sql
+use maravilla
+insert into pelicula (codigo,titulo) values ('MA012','Antman Quantumania');
+```
+
+Por último comprobamos que se ha añadido un registro a la tabla accesos de la base de datos audiotria.
+
+```sql
+use auditoria
+select * from accesos;
+```
+
+Resultado:
+
+```sql
++--------+----------------+---------------------+
+| codigo | usuario        | fecha               |
++--------+----------------+---------------------+
+|      1 | root@localhost | 2023-02-21 18:55:21 |
++--------+----------------+---------------------+
+1 row in set (0,00 sec)
+```
+
+
+**4) Realizar una auditoría de grano fino para almacenar información sobre la inserción de empleados con sueldo superior a 2000 en la tabla emp del usuario scott.**
+
+MySQL no ofrece una opción nativa para realizar una auditoría de grano fino como en Oracle.
 
 ## 9. Averigua las posibilidades que ofrece MongoDB para auditar los cambios que va sufriendo un documento. Demuestra su funcionamiento.
 
