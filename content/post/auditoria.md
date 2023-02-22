@@ -1159,7 +1159,8 @@ db.adminCommand(
 )
 ```
 
-Para más info ver: 
+Para más info ver:
+
 - [Comando setAuditConfig](https://www.mongodb.com/docs/manual/reference/command/setAuditConfig/#mongodb-dbcommand-dbcmd.setAuditConfig)
 - [Configurar filtros de auditoría](https://www.mongodb.com/docs/manual/tutorial/configure-audit-filters/)
 - [Significado de los mensajes de eventos de auditoría](https://www.mongodb.com/docs/manual/reference/audit-message/).
@@ -1176,3 +1177,5 @@ mongod --dbpath data/db --auditDestination file --auditFilter '{
 }'
 --auditFormat BSON --auditPath data/db/auditLog.bson
 ```
+
+En el comando anterior se auditan los accesos a la colección película de la base de datos maravilla cada vez que se utilicen las opciones 'find', 'insert', 'delete', 'update' y 'findandmodify' con los datos de dicha colección.
