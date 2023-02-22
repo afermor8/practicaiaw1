@@ -1165,3 +1165,14 @@ Para más info ver:
 - [Significado de los mensajes de eventos de auditoría](https://www.mongodb.com/docs/manual/reference/audit-message/).
 
 ## 10. Averigua si en MongoDB se pueden auditar los accesos a una colección concreta. Demuestra su funcionamiento.
+
+Lo podríamos hacer de la siguiente forma:
+
+```bash
+mongod --dbpath data/db --auditDestination file --auditFilter '{
+    atype: "authCheck",
+    "param.ns": "maravilla.pelicula",
+    "param.command": { $in: [ "find", "insert", "delete", "update", "findandmodify" ] }
+}'
+--auditFormat BSON --auditPath data/db/auditLog.bson
+```
