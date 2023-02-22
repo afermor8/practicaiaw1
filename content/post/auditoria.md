@@ -1028,4 +1028,140 @@ MySQL no ofrece una opción nativa para realizar una auditoría de grano fino co
 
 ## 9. Averigua las posibilidades que ofrece MongoDB para auditar los cambios que va sufriendo un documento. Demuestra su funcionamiento.
 
+MongoDB Enterprise incluye la capacidad de auditaría para instancias mongod y mongos. La función de auditoría permite a los administradores y usuarios realizar un seguimiento de la actividad del sistema para implementaciones con múltiples usuarios y aplicaciones.
+
+**Habilitar y configurar la salida de auditoría.**
+
+Para habilitar la auditoría en MongoDB Enterprise, se establece un destino de salida de auditoría con `--auditDestination`.
+
+El destino, donde se escriben los evenos de auditoría pueden ser: en la consola, syslog, un archivo JSON o un archivo BSON.
+
+- **Syslog:**
+
+Para habilitar la auditoría e imprimir eventos de auditoría en syslog en formato JSON, se especifica `syslog` para la configuración `--auditDestination`. Se pueden incluir opciones adicionales según sea necesario para nuestra configuración (por ejemplo la opción `--bind_ip`). La forma en la que se escribiría el comando sería la siguiente:
+
+```bash
+mongod --dbpath data/db --auditDestination syslog
+```
+  
+Otra forma  de hacerlo es especificar estas opciones en el archivo de configuración:
+
+```bash
+storage:
+   dbPath: data/db
+auditLog:
+   destination: syslog
+```
+
+- **Consola:**
+
+Para habilitar la auditoría y mostrar los eventos como salida estándar (es decir, `stdout`), se especifica `console` para la configuración `--auditDestination` (también se pueden especificar algunas opciones adicionales como `--bind_ip`).
+
+```bash
+mongod --dbpath data/db --auditDestination console
+```
+
+También se puede especificar estas opciones en el archivo de configuración:
+
+```bash
+storage:
+    dbPath: data/db
+auditLog:
+    destination: console
+```
+
+- **Archivo JSON:**
+
+Para habilitar la auditoría e imprimir eventos de auditoría en un archivo en formato JSON, se especifican las siguientes opciones:
+
+| Opción | Valor |
+|------------------------|------------|
+| --auditDestination | file |
+| --auditFormat | JSON |
+| --auditPath | El nombre del archivo de salida. Acepta el nombre de ruta completo o el nombre de ruta relativo. |
+
+Por ejemplo, lo siguiente habilita la auditoría y registra los eventos de auditoría en un archivo con el nombre de ruta relativa data/db/auditLog.json:
+
+```bash
+mongod --dbpath data/db --auditDestination file --auditFormat JSON --auditPath data/db/auditLog.json
+```
+
+Como en los casos anteriores, también podemos añadir opciones adicionales según sea necesario para la configuración (`--bind_ip`).
+
+El archivo de auditoría se puede rotar con el comando `logRotate`, ya sea junto con el registro del servidor o de forma independiente. Los detalles de la rotación se pueden configurar con la opción de archivo de configuración `systemLog.logRotate` o la opción de línea de comandos `--logRotate`.
+
+También puede especificar estas opciones en el archivo de configuración:
+
+```bash
+storage:
+   dbPath: data/db
+auditLog:
+   destination: file
+   format: JSON
+   path: data/db/auditLog.json
+```
+
+La impresión de eventos de auditoría en un archivo en formato JSON degrada el rendimiento del servidor más que la impresión en un archivo en formato BSON.
+
+- **Archivo BSON:**
+
+Para habilitar la auditoría e imprimir eventos en un archivo en formato binario BSON, se especifican las siguientes opciones:
+
+| Opción | Valor |
+|------------------------|------------|
+| --auditDestination | file |
+| --auditFormat | BSON |
+| --auditPath | El nombre del archivo de salida. Acepta el nombre de ruta completo o el nombre de ruta relativo. |
+
+Por ejemplo, el siguiente comando habilita la auditoría y registra eventos de auditoría en un archivo BSON con el nombre de ruta relativo de data/db/auditLog.bson:
+
+```bash
+mongod --dbpath data/db --auditDestination file --auditFormat BSON --auditPath data/db/auditLog.bson
+```
+
+El archivo de auditoría se rota al mismo tiempo que el archivo de registro del servidor. Los detalles de la rotación se pueden configurar con la opción de archivo de configuración `systemLog.logRotate` o la opción de línea de comandos `--logRotate`.
+
+También puede especificar estas opciones en el archivo de configuración:
+
+```bash
+storage:
+   dbPath: data/db
+auditLog:
+   destination: file
+   format: BSON
+   path: data/db/auditLog.bson
+```
+
+Con el siguiente comando se convierte y muestra el registro de auditoría en un formato legible mediante `bsondump`:
+
+```bash
+bsondump data/db/auditLog.bson
+```
+
+**Qué se alamacena en un registro de auditoría.**
+
+Una vez habilitado, el sistema de auditoría puede registrar las siguientes operaciones:
+
+- Esquema (DDL)
+- Conjunto de réplicas y clúster fragmentado
+- Autenticación y autorización
+- Operaciones CRUD (requiere `auditAuthorizationSuccess` establecido en true).
+
+Además con el sistema de auditoría se pueden configurar filtros para restringir los eventos capturados.
+
+Por último decir que si queremos ver la configuración de auditoría de una instancia mongod o mongos usaremos el siguiente comando:
+
+```bash
+db.adminCommand(
+   {
+     getAuditConfig: 1
+   }
+)
+```
+
+Para más info ver: 
+- [Comando setAuditConfig](https://www.mongodb.com/docs/manual/reference/command/setAuditConfig/#mongodb-dbcommand-dbcmd.setAuditConfig)
+- [Configurar filtros de auditoría](https://www.mongodb.com/docs/manual/tutorial/configure-audit-filters/)
+- [Significado de los mensajes de eventos de auditoría](https://www.mongodb.com/docs/manual/reference/audit-message/).
+
 ## 10. Averigua si en MongoDB se pueden auditar los accesos a una colección concreta. Demuestra su funcionamiento.
