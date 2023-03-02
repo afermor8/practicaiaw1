@@ -100,9 +100,13 @@ SET ECHO ON
 ### 1. Realiza una exportación del esquema de SCOTT usando Oracle Data Pump con las siguientes condiciones:
 
 **• Exporta tanto la estructura de las tablas como los datos de las mismas.**
+
 **• Excluye la tabla BONUS y los departamentos con menos de dos empleados.**
+
 **• Realiza una estimación previa del tamaño necesario para el fichero de exportación.**
+
 **• Programa la operación para dentro de 2 minutos.**
+
 **• Genera un archivo de log en el directorio raíz.**
 
 Le damos permisos a Scott para exportar datos.
@@ -408,6 +412,43 @@ El trabajo "SYSTEM"."EXPORT_FULL" ha terminado correctamente en Jue Mar 2 13:38:
 ```
 
 ### 4. Intenta realizar operaciones similares de importación y exportación con las herramientas proporcionadas con MySQL desde línea de comandos, documentando el proceso.
+
+#### Exportación con mysqldump
+
+La herramienta mysqldump permite exportar una o varias bases de datos completas o sólo algunas tablas de una base de datos. A continuación, se muestran algunos ejemplos:
+
+**Exportar la base de datos maravilla al completo**
+
+```sql
+mysqldump -u admin -p maravilla > backup_maravilla.sql
+```
+
+![exportacion](/img/movdatos/3.png)
+
+En este ejemplo, admin es el nombre del usuario de MySQL y maravilla es el nombre de la base de datos que se desea exportar. El operador > se utiliza para redirigir la salida del comando a un archivo llamado backup_maravilla.sql. Al ejecutar este comando, se solicitará la contraseña de MySQL.
+
+**Exportar sólo algunas tablas de la base de datos maravilla**
+
+```sql
+mysqldump -u admin -p maravilla pelicula actor > backup_maravilla_pel_act.sql
+```
+
+![exportacion](/img/movdatos/4.png)
+![exportacion](/img/movdatos/5.png)
+
+En este ejemplo, se exportan dos tablas de la base de datos maravilla: pelicula y actor. Se guarda en un archivo llamado backup_maravilla_pel_act.sql.
+
+#### Importación
+
+Mysql permite importar datos de un archivo de exportación sql a una base de datos. A continuación, se muestra un ejemplo:
+
+```sql
+mysql -u root -p prueba < backup_maravilla.sql
+```
+
+En el ejemplo se importan los datos de la exportación anterior a la base de datos prueba del usuario root.
+
+![exportacion](/img/movdatos/6.png)
 
 ### 5. Intenta realizar operaciones similares de importación y exportación con las herramientas proporcionadas con Postgres desde línea de comandos, documentando el proceso.
 
