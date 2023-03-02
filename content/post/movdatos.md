@@ -419,7 +419,7 @@ La herramienta mysqldump permite exportar una o varias bases de datos completas 
 
 **Exportar la base de datos maravilla al completo**
 
-```sql
+```bash
 mysqldump -u admin -p maravilla > backup_maravilla.sql
 ```
 
@@ -429,7 +429,7 @@ En este ejemplo, admin es el nombre del usuario de MySQL y maravilla es el nombr
 
 **Exportar sólo algunas tablas de la base de datos maravilla**
 
-```sql
+```bash
 mysqldump -u admin -p maravilla pelicula actor > backup_maravilla_pel_act.sql
 ```
 
@@ -442,7 +442,7 @@ En este ejemplo, se exportan dos tablas de la base de datos maravilla: pelicula 
 
 Mysql permite importar datos de un archivo de exportación sql a una base de datos. A continuación, se muestra un ejemplo:
 
-```sql
+```bash
 mysql -u root -p prueba < backup_maravilla.sql
 ```
 
@@ -451,6 +451,128 @@ En el ejemplo se importan los datos de la exportación anterior a la base de dat
 ![exportacion](/img/movdatos/6.png)
 
 ### 5. Intenta realizar operaciones similares de importación y exportación con las herramientas proporcionadas con Postgres desde línea de comandos, documentando el proceso.
+
+En PostgreSQL podemos utilizar las herramientas pg_dump y pg_restore.
+
+**Exportación:**
+
+Para exportar una base de datos, utilizamos el comando pg_dump. Por ejemplo, para exportar la base de datos "maravilla" al archivo "postgres_backup_maravilla.sql", ejecutamos el siguiente comando:
+
+```bash
+pg_dump -U postgres maravilla > postgres_backup_maravilla.sql
+```
+
+![exportacion](/img/movdatos/7.png)
+
+**Importación:**
+
+Para importar una base de datos desde un archivo, utilizamos el comando pg_restore. Por ejemplo, para importar la base de datos "maravilla" desde el archivo "postgres_backup_maravilla.sql", ejecutamos el siguiente comando:
+
+```bash
+psql -U postgres prueba_import < postgres_backup_maravilla.sql
+```
+
+```bash
+SET
+SET
+SET
+SET
+SET
+ set_config 
+------------
+ 
+(1 fila)
+
+SET
+SET
+SET
+SET
+CREATE SCHEMA
+ALTER SCHEMA
+COMMENT
+CREATE EXTENSION
+COMMENT
+CREATE EXTENSION
+COMMENT
+CREATE FUNCTION
+ALTER FUNCTION
+COMMENT
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+COMMENT
+CREATE FUNCTION
+ALTER FUNCTION
+COMMENT
+SET
+SET
+CREATE TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE SEQUENCE
+ALTER TABLE
+ALTER SEQUENCE
+CREATE VIEW
+ALTER TABLE
+COMMENT
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+COPY 2
+COPY 28
+COPY 12
+COPY 77
+ setval 
+--------
+      2
+(1 fila)
+
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+```
+
+![exportacion](/img/movdatos/8.png)
 
 ### 6. Exporta los documentos de una colección de MongoDB que cumplan una determinada condición e impórtalos en otra base de datos.
 
