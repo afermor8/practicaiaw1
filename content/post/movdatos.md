@@ -452,8 +452,6 @@ En el ejemplo se importan los datos de la exportación anterior a la base de dat
 
 ### 5. Intenta realizar operaciones similares de importación y exportación con las herramientas proporcionadas con Postgres desde línea de comandos, documentando el proceso.
 
-En PostgreSQL podemos utilizar las herramientas pg_dump y pg_restore.
-
 **Exportación:**
 
 Para exportar una base de datos, utilizamos el comando pg_dump. Por ejemplo, para exportar la base de datos "maravilla" al archivo "postgres_backup_maravilla.sql", ejecutamos el siguiente comando:
@@ -466,7 +464,7 @@ pg_dump -U postgres maravilla > postgres_backup_maravilla.sql
 
 **Importación:**
 
-Para importar una base de datos desde un archivo, utilizamos el comando pg_restore. Por ejemplo, para importar la base de datos "maravilla" desde el archivo "postgres_backup_maravilla.sql", ejecutamos el siguiente comando:
+Para importar una base de datos desde un archivo, utilizamos psql. Por ejemplo, para importar la base de datos "maravilla" desde el archivo "postgres_backup_maravilla.sql", ejecutamos el siguiente comando:
 
 ```bash
 psql -U postgres prueba_import < postgres_backup_maravilla.sql
