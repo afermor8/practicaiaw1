@@ -125,7 +125,7 @@ Creo un virtualhost que tendrá el siguiente contenido (he creado los alias para
                 Require all granted
         </Directory>
         Alias /static/ /home/usuario1/django_tutorial/polls/static/
-        <Directory /homre/usuario1/django_tutorial/polls/static>
+        <Directory /home/usuario1/django_tutorial/polls/static>
                 Require all granted
         </Directory>
 
@@ -157,11 +157,13 @@ Añado a /etc/hosts la resolución estática:
 
 Por último añadir django.arantxa.org a settings.py (ALLOWED_HOSTS) y cambiar el usuario y grupo a www-data.
 
+![](/img/django/p10.png)
+
 ```
-chown -R django_tutorial
+cd
+chown -R www-data:www-data django_tutorial
 ```
 
-![](/img/django/p10.png)
 ![](/img/django/p11.png)
 ![](/img/django/p12.png)
 ![](/img/django/p13.png)
@@ -495,7 +497,7 @@ Vamos a realizar cambios en el entorno de desarrollo y posteriormente vamos a su
 2. Modifica la imagen de fondo que se ve la aplicación.
 3. Vamos a crear una nueva tabla en la base de datos, para ello sigue los siguientes pasos:
 
-◦ Añade un nuevo modelo al fichero polls/models.py:
+- Añade un nuevo modelo al fichero polls/models.py:
 
 ```
             class Categoria(models.Model):        
@@ -506,9 +508,9 @@ Vamos a realizar cambios en el entorno de desarrollo y posteriormente vamos a su
                           return self.Abr+" - "+self.Nombre
 ```
 
-◦ Crea una nueva migración.
-◦ Y realiza la migración. 
-◦ Añade el nuevo modelo al sitio de administración de django:
+- Crea una nueva migración.
+- Y realiza la migración. 
+- Añade el nuevo modelo al sitio de administración de django:
 Para ello cambia la siguiente línea en el fichero polls/admin.py:
 
 ```
@@ -527,7 +529,7 @@ Y añade al final la siguiente línea:
             admin.site.register(Categoria)
 ```
 
-◦ Despliega el cambio producido al crear la nueva tabla en el entorno de producción. 
+- Despliega el cambio producido al crear la nueva tabla en el entorno de producción.
 
 Explica los cambios que has realizado en el entorno de desarrollo y cómo lo has desplegado en producción para cada una de las modificaciones. Entrega pantallazos donde se vean las distintas modificaciones y que todo está funcionando. (3,5 puntos)
 
@@ -539,18 +541,33 @@ Modificamos la página inicial en el servidor de desarrollo y añado mi nombre a
 ```
 cd django_tutorial/polls/templates/polls/
 sudo nano index.html
+```
+
+```
+{% load static %}
+
+<link rel="stylesheet" type="text/css" href="{% static 'polls/style.css' %}">
 
 <h1>Arantxa Fernández Morató</h1>
 <h2>Práctica Despliegues de Aplicaciones Python (Django). ASIR 2</h2>
 
+{% if latest_question_list %}
+    <ul>
+    {% for question in latest_question_list %}
+    <li><a href="{% url 'polls:detail' question.id %}">{{ question.question_text }}</a></li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No polls are available.</p>
+{% endif %}
 ```
 
 ![](/img/django/p25.png)
 
-Ahora cambiamos la imagen de fondo, la cual se encuentra en /django_tutorial/polls/static/polls/images/background.jpg. Me descargo otra imagen y le doy el nombre de la actual para que la sobreescriba.
+Ahora cambiamos la imagen de fondo, la cual se encuentra en `django_tutorial/polls/static/polls/images/background.jpg`. Me descargo otra imagen y le doy el nombre de la actual para que la sobreescriba.
 
 ```
-cd /django_tutorial/polls/static/polls/images/
+cd django_tutorial/polls/static/polls/images/
 sudo wget https://img.freepik.com/vector-gratis/fondo-ondulado-abstracto-marron-claro_1108-592.jpg?w=2000 -O background.jpg
 ```
 
@@ -559,4 +576,93 @@ Comprobamos los cambios en la web.
 ![](/img/django/p26.png)
 
 
+Creo una nueva tabla en la base de datos. Para ello añadimos al final del fichero models.py lo siguiente:
 
+```
+sudo nano django_tutorial/polls/models.py
+
+class Categoria(models.Model):        
+    Abr = models.CharField(max_length=4)
+    Nombre = models.CharField(max_length=50)
+
+    def __str__(self):
+        return self.Abr+" - "+self.Nombre
+```
+
+Para realizar los siguientes pasos he tenido que volver a cambiar el usuario y grupo propietario de django_tutorial: `sudo chown -R usuario:usuario django_tutorial/`
+
+Creo una nueva migración:
+
+```
+python3 django_tutorial/manage.py makemigrations
+```
+
+Realizo la migración:
+
+```
+python3 django_tutorial/manage.py migrate
+```
+
+![](/img/django/p27.png)
+
+
+Añado un nuevo modelo al sitio de administración de django. Para hacer esto, en el fichero admin.py, añado a la línea `from .models import Choice, Question` la nueva tabla llamada Categoría. Y añadimos al final la línea `admin.site.register(Categoria)`.
+
+```
+sudo nano django_tutorial/polls/admin.py
+```
+
+```
+from .models import Choice, Question, Categoria
+...
+admin.site.register(Categoria)
+```
+
+![](/img/django/p28.png)
+
+
+Comprobamos que funciona la web en el entorno de desarrollo. Para ello tenemos que volver a cambiar el usuario y grupo de django_tutorial: `sudo chown -R www-data:www-data django_tutorial/`
+
+![](/img/django/p29.png)
+
+![](/img/django/p30.png)
+
+
+Copio lainformación de los datos de la aplicación en el entorno de desarrollo en nuestro servidor de producción.
+
+En el entorno de desarrollo:
+
+```
+python3 django_tutorial/manage.py dumpdata > db2.json
+scp db.json arantxa@217.160.225.205:.
+```
+
+En el servidor de producción, antes de actualizar los datos tenemos que actualizar el repositorio git (git pull).
+
+> Al actualizar el repositorio, el fichero settings.py se actualiza con el host que teníamos en el entorno de desarrollo. Debemos asegurarnos de que en el entorno de producción el host permitido es el siguiente: `ALLOWED_HOSTS = ['python.afm-tars.es','217.160.225.205']`
+
+Una vez actualizado el repositorio en el entorno de producción realizamos la migración:
+
+```
+python3 django_tutorial/manage.py migrate
+```
+
+Ya podremos actualizar los datos:
+
+```
+python3 django_tutorial/manage.py loaddata db.json
+```
+
+Reiniciamos el servicio uwsgi-django:
+
+```
+sudo systemctl restart uwsgi-django
+```
+
+Comprobamos que los cambios (la tabla categoría, nuestro nombre y el fondo de pantalla) se han aplicado correctamente en el entorno de producción:
+
+![](/img/django/p31.png)
+
+![](/img/django/p32.png)
+
+![](/img/django/p33.png)
