@@ -25,21 +25,15 @@ Entrega:
 ## 1. Creación de imagen docker
 
 En el entorno de desarrollo (máquina debiaprueba2) donde tengo clonado el repositorio django_tutorial,
-creo una red y el contenedor mariadb.
-
-```
-sudo docker network create net_django
-
-sudo docker run -d --name mariadb -v vol_polls:/var/lib/mysql --network net_django -e MARIADB_ROOT_PASSWORD=admin -e MARIADB_USER=django -e MARIADB_PASSWORD=admin -e MARIADB_DATABASE=django mariadb
-```
-
-Modifico settings.py, quedando de la siguiente forma:
+modifico settings.py.
 
 ```
 cd git/django_tutorial
 
 nano django_tutorial/settings.py
 ```
+
+Quedando de la siguiente forma:
 
 ```
 """
@@ -307,7 +301,9 @@ Generamos un certificado LetsEncrypt:
 
 ```
 sudo systemctl stop nginx
+
 sudo certbot certonly --standalone -d django-docker.afm-tars.es
+
 sudo systemctl start nginx
 ```
 
@@ -315,6 +311,7 @@ Clonamos el repositorio:
 
 ```
 cd git
+
 git clone git@github.com:afermor8/django_tutorial.git
 ```
 
@@ -328,6 +325,7 @@ Levanto los contenedores:
 
 ```
 cd django_tutorial
+
 sudo docker-compose up -d
 ```
 
@@ -384,6 +382,7 @@ Para que aparezcan las preguntas que creamos en el servidor de desarrollo tenemo
 
 ```
 sudo docker exec bd_mariadb_django mysqldump -u django -pdjango django > backup.sql
+
 scp backup.sql arantxa@217.160.225.205:.
 ```
 
@@ -391,13 +390,15 @@ scp backup.sql arantxa@217.160.225.205:.
 
 ```
 sudo docker cp backup.sql db_mariadb_django:/backup.sql
+
 sudo docker exec -it bd_mariadb_django bash
+
 mysql -u django -p django < backup.sql
 ```
 
-Accedemos en el navegador:
+**Comprobación:**
 
-https://django-docker.afm-tars.es/
+Accedemos en el navegador a https://django-docker.afm-tars.es/
 
 ![](/img/docker/6.png)
 
