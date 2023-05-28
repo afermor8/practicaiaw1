@@ -1,5 +1,5 @@
 ---
-title: "Recolección centralizada de logs de sistema, mediante journald."
+title: "Recolección centralizada de logs de sistema, mediante journald"
 date: 2023-05-27T19:09:34+02:00
 draft: true
 tags: ["ASO"]
