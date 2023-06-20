@@ -22,17 +22,25 @@ bigimg: [{src: "/img/triangle.jpg", desc: "Triangle"}, {src: "/img/sphere.jpg", 
 
 ## La corrección consistirá tanto en la restauración puntual de un fichero en cualquier fecha como la restauración completa de una de las instancias la última semana de curso.
 
-
 ---------------------------------------
 
+***!!!NOTA: Si estás viendo esto y eres de otro año, decirte que esta entrada la creé mientras hacía investigación sobre cómo funcionaba Rsync y como implementarlo para hacer copias de seguridad usando scripts bash y crontab. Pero debido a que mañana es mi último día de curso y no creo que siga actualizando más sobre el tema, decirte que NO HE PODIDO PROBAR NADA y NO SÉ SI FUNCIONA realmente nada de lo ecrito en este post. Aún así te puede servir de base para seguir investigando y terminar de hacerlo por ti mismo. Suerte!!***
 
-### Preparación
+----------------------------------
 
+### Introducción
 
 La aplicación que he decidido utilizar para realizar el proceso de copias de seguridad es ***rsync***.
 
-Rsync es ........
+Rsync es una herramienta de sincronización y copia de archivos utilizada principalmente en sistemas operativos tipo Unix. Proporciona una forma eficiente de transferir datos entre sistemas locales o remotos, ya sea en la misma máquina o a través de una red.
 
+La característica distintiva de rsync es su capacidad para copiar y sincronizar solo las diferencias entre archivos existentes, lo que se conoce como "differential synchronization". En lugar de transferir archivos completos cada vez, rsync analiza los archivos de origen y destino y transfiere solo las partes que han cambiado, lo que minimiza el ancho de banda utilizado y acelera la sincronización.
+
+Rsync también tiene otras características útiles, como la compresión de datos durante la transferencia, la posibilidad de preservar los atributos del archivo, la opción de copiar enlaces simbólicos y la capacidad de sincronizar directorios de forma recursiva.
+
+Además de la transferencia local, rsync es ampliamente utilizado para realizar copias de seguridad remota, replicación de servidores y sincronización de archivos en sistemas distribuidos. Su versatilidad y eficiencia lo convierten en una herramienta muy popular en entornos de administración de sistemas y respaldo de datos.
+
+### 1. Instalación y preparación del volumen
 
 En Debian viene instalado por defecto, pero si no lo tuviéramos se puede instalar fácilmente con apt.
 
@@ -60,7 +68,6 @@ Este volumen lo voy a asociar a **alfa**.
 
 ![](/img/backup/2.png)
 
-
 **En alfa:**
 
 ```bash
@@ -80,13 +87,13 @@ arantxa@alfa:~$ sudo umount /dev/vdb
 umount: /dev/vdb: not mounted.
 ```
 
-Intalo el paquete xfsprogs:
+Instalo el paquete xfsprogs:
 
 ```bash
 sudo apt-get install xfsprogs
 ```
 
-Formateamos el volumen usando el sistema de ficheros *xfs*.
+Formateamos el volumen usando el sistema de ficheros ***xfs***.
 
 ```bash
 arantxa@alfa:~$ sudo mkfs.xfs /dev/vdb
@@ -154,49 +161,92 @@ vda     254:0    0   30G  0 disk
 vdb     254:16   0   20G  0 disk /backup
 ```
 
-### Información a guardar
+### 2. Información a guardar
 
-Voy a guardar el contenido de /home, /etc, /var, /opt, /usr/share
+**Fichero de directorios a respaldar:**
 
+Voy a crear un fichero de texto en el que agregaré línea por línea los directorios a los que hay que hacerle copias de seguridad. Este fichero lo usaré más tarde con el comando rsync.
 
-Críticos:
+```bash
+cd /backup/
+nano a_respaldar.txt
+```
 
-alfa	Reglas iptables
-bravo	Web (/var/www, /etc/httpd)
-charlie	Servidor dns (/var/chache/bind, /etc/bind, ...)
-delta	Servidor correo (/etc/postfix)
+```txt
+/etc
+/var/log
+/var/lib
+/root
+/home
+/opt
+/srv
+/usr/share
+```
 
+Todo ese será el contenido del que se hará copia de seguridad. Pero en mis servidores hay algunos ficheros "críticos" que deberían ser guardados de forma cifrada (sin embargo en este post no me centraré en ello, investígalo por ti mismo). Estos ficheros podrían ser:
 
+- Contraseñas
+- Configuración de red de las máquinas
+- En alfa: fichero de reglas iptables, config del servidor LDAP (ldap.conf, nsswitch.conf, sssd.conf...), SSHD (sshd_config)...
+- En bravo: servidor web (/var/www, /etc/httpd), cliente LDAP (ldap.conf, sssd.conf...), cliente ssh (ssh_config)...
+- En charlie: servidor dns (/var/chache/bind, /etc/bind...)
+- En delta: servidor de correo (/etc/postfix), cliente LDAP...
 
-### Información a excluir
+### 3. Información a excluir
 
+Aunque en mi caso voy a indicar los directorios de los que quiero hacer copia de seguridad es una buena práctica indicar en el comando rsync algunos directorios a expluir si hacemos una copia completa de / (raiz). Por ejemplo:
 
-### Copias de seguriadad (diaria-diferencial, semanal-completa, mensual-completa)
+```bash
+rsync -aAXv --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} / /path/to/backup/folder
+```
 
-He decidido que la copia diaria será de tipo diferencial.
-Requiere más espacio de almacenamiento y más tiempo de respaldo, pero la restauración es más rápida, ya que solo se necesita acceder a la copia completa y la última copia diferencial. Es adecuada si deseas minimizar el tiempo de restauración y no tienes restricciones de espacio de almacenamiento.
+Al utilizar las opciones -aAX, los archivos se preserva los permisos, propietarios, grupos, atributos extendidos y los atributos de contexto de seguridad de los archivos en sistemas de archivos compatibles, entre otros (enlaces simbólicos, dispositivos, permisos, propiedades, tiempos de modificación, ACLs...).
+
+Como he dicho, en mi caso, indicaré los directorios de los que voy a hacer copia de seguridad, por lo que no es necesario indicar todos esos directorio innecesarios.
+
+Habría que tener en cuenta que si no se especifican los directorios que se quieren respaldar, sino que se epecifican los que se quieren excluir, hay que indicar el directorio donde tenemos nuestro volumen montado. En mi caso sería /backup, es decir, donde se guardan las copias de seguridad, de forma que al realizar una copia de seguridad no se cree un bucle infinito que pueda llenar el disco rápidamente. Se puede hacer especificandolo en el comando:
+
+```bash
+--exclude={"/backup"}
+```
+
+O creando un fichero donde añadiremos todos los directorios a excluir. Esta opción es mejor por si en el futuro quisiéramos agregar alguno más:
+
+```bash
+nano archivos_a_excluir.txt
+```
+
+```
+/backup
+```
+
+```bash
+--exclude-from="archivos_a_excluir.txt"
+```
+
+Otra cosa a tener en cuenta es decidir si queremos excluir subdirectorios sin importancia como:
+
+- /home/*/.thumbnails/
+- /home/*/.cache/mozilla/
+- /home/*/.cache/chromium/
+- /home/*/.local/share/Trash/
+- Y si GVFS está instalado debe excluirse /home/*/.gvfs para evitar errores de rsync.
+
+### 4. Esquema de copias de seguriadad
+
+**Copia diferencial (diaria):**
+
+He decidido que la copia diaria será de tipo diferencial. Las copias diferenciales requieren más espacio de almacenamiento y más tiempo de respaldo, pero la restauración es más rápida, ya que solo se necesita acceder a la copia completa y la última copia diferencial. Es adecuada si se desea minimizar el tiempo de restauración y no se tienen restricciones de espacio de almacenamiento.
 
 Se guardarán las copias de todos los días de la semana, y cuando termine la semana se empezará a sobreescribir los datos de la copia diferencial más antigua, de forma que siempre tengamos acceso a las copias diferenciales de los últimos 7 días.
 
+**Copia completa (semanal y mensual):**
 
+Se guardarán copias completas semanalmente y cada cuatro semanas se borrarán las 3 copias completas más nuevas, de esta forma siempre se quedará guardada una copia completa al mes (aunque habrá meses que tengan dos copias ya que lo meses no tienen cuatro semanas justas).
 
-Se guardarán copias completas semanalmente.
+**Esquema de directorios:**
 
-Cada cuatro semanas se borrarán las 3 copias completas más nuevas, de esta forma siempre se quedará guardada una copia completa al mes (unque habrá meses que tengan dos copias ya que lo meses no tienen cuatro semanas justas). 
-
-
-!!!MAL, en l futuro deberían haber decenas de copias completas a lo largo de los años
-Si 4 copias o mas entonces
-  borrar las 3 más nuevas
-  crear copia completa
-
-
-
-
-### Scripts
-
-Directorios:
-
+```txt
 /backup/completa/latest
 /backup/completa/old
 
@@ -207,57 +257,21 @@ Directorios:
 /backup/diff/vie
 /backup/diff/sab
 /backup/diff/dom
+```
 
+### 5. Scripts
 
+Los script los he creado en el directorio /backup. Se realizarán 3 scripts que tendrán el siguiente formato:
 
-3 SCRIPTS:
+**5.1. SCRIPT COPIA COMPLETA**
 
-
-1. Copia completa
-
-    Si existe carpeta
-      copia a /backup/completa/old
-      borrar carpeta de /backup/completa/latest
-    tminar if
-    Crear copia completa en /backup/completa/latest
-      Crear carpeta con la fecha de la copia donde estará todo el contenido
-
-*Crontab: ejecutar cada 7 días
-
-
-
-
-2. Planificación
-
-    Borrar 3 últimas carpetas de /backup/completa/old
-
-*Crontab: ejecutar cada 4 semanas
-
-
-
-
-3. Copia diferencial (sobre la ultima copia completa)
-
-    Si exite carpeta con ese día de la semana entonces
-      eliminar carpeta
-    terminar if
-    Crear copia diferencial
-      Añadir carpeta con día de la semana
-      Nos basamos en la última copia completa
-      
-*Crontab: ejecutar diariamente
-
-
-
-
-
-1. SCRIPT COMPLETA
+```bash
+nano completa.sh
+sudo chmod 755 completa.sh
+```
 
 ```bash
 #!/bin/bash
-
-# Ruta de origen (directorio que deseas respaldar)
-SOURCE_DIR="/ruta/de/origen"
 
 # Ruta de destino (directorio donde se guardarán las copias de seguridad)
 DEST_DIR="/backup/completa"
@@ -265,32 +279,54 @@ DEST_DIR="/backup/completa"
 # Obtener la fecha actual
 DATE=$(date +"%Y-%m-%d")
 
-# Mover la copia completa anterior a la carpeta de copias antiguas
+# Si existe algo en la carpeta comprimir la información guardada en old y borrar lo de latest
 if [ -d "$DEST_DIR/latest/" ]; then
-    mv "$DEST_DIR/latest/*" "$DEST_DIR/old/"
+    tar -zcf /backup/completa/old/$DATE.tar /backup/completa/latest/*
+    rm -r /backup/completa/latest/*
+    #mv "$DEST_DIR/latest/*" "$DEST_DIR/old/"
 fi
 
-# Realizar la copia completa en la carpeta latest
-rsync -a --delete --quiet "$SOURCE_DIR" "$DEST_DIR/latest/$DATE"
+# Realizar la copia completa en /backup/completa/latest/ en un directorio con la fecha del backup
+rsync -aAX --files-from="/backup/a_respaldar.txt" --quiet / "$DEST_DIR/latest/$DATE"
 ```
 
+- --archive, -a       archive mode is -rlptgoD (no -A,-X,-U,-N,-H)
+  -  -r              recurse into directories
+  -  -l              copy symlinks as symlinks
+  -  -p              preserve permissions
+  -  -t              preserve modification times
+  -  -g              preserve group
+  -  -o              preserve owner (super-user only)
+  -  -D              The -D option is equivalent to --devices --specials.
+      - --devices             This option causes rsync to transfer character and block device  files  to  the  remote system  to recreate these devices.  This option has no effect if the receiving rsync is not run as the super-user (see also the --super and --fake-super options).
+      - --specials             This option causes rsync to transfer special files such as named sockets and fifos.
+- --acls, -A          preserve ACLs (implies --perms)
+- --xattrs, -X        preserve extended attributes
+- --files-from='a_respaldar.txt': lee la lista de archivos y directorios a respaldar desde el archivo a_respaldar.txt
 
+**5.2. SCRIPT PLANIFICACIÓN**
 
-
-2. SCRIPT PLAN
-
-cd /backup/completa/old
-ls -t | head -3 | xargs rm -r
-
-
-
-3. SCRIPT DIFF
+```bash
+nano plan.sh
+sudo chmod 755 plan.sh
+```
 
 ```bash
 #!/bin/bash
+# Borrar 3 últimas carpetas de /backup/completa/old
+cd /backup/completa/old
+ls -t | head -3 | xargs rm -r
+```
 
-# Ruta de origen (directorio que deseas respaldar)
-SOURCE_DIR="/ruta/de/origen"
+**5.3. SCRIPT COPIA DIFERENCIAL (sobre la ultima copia completa)**
+
+```bash
+nano diff.sh
+sudo chmod 755 diff.sh
+```
+
+```bash
+#!/bin/bash
 
 # Ruta de destino (directorio donde se guardarán las copias de seguridad)
 DEST_DIR="/backup/diff"
@@ -303,214 +339,66 @@ if [ -d "$DEST_DIR/$DAY" ]; then
     rm -rf "$DEST_DIR/$DAY"
 fi
 
-# Realizar la copia diferencial basada en la última copia completa
-rsync -a --delete --quiet --link-dest="$DEST_DIR/../completa/latest/*/" "$SOURCE_DIR" "$DEST_DIR/$DAY/"
+# Realizar la copia diferencial basada en la última copia completa en una carpeta con el día de la semana
+rsync -aAXS --delete --files-from="/backup/a_respaldar.txt" --quiet --link-dest="/backup/completa/latest/" / "$DEST_DIR/$DAY/"
 ```
 
+- -S: para optimizar el almacenamiento de archivos que contienen muchos caracteres nulos o ceros consecutivos. En lugar de asignar espacio de almacenamiento para cada carácter nulo individual, los bloques dispersos permiten que se almacene solo la información necesaria para recrear los caracteres nulos consecutivos. La opción -S viene bien cuando se tienen archivos dispersos, como discos virtuales, imágenes Docker y similares.
 
+- --delete: Elimina los archivos en el directorio de destino que no existen en el directorio de origen. Esto garantiza que el directorio de destino refleje exactamente el contenido del directorio de origen.
 
+- --quiet: Ejecuta rsync en modo silencioso, sin mostrar información detallada sobre los archivos y directorios que se están sincronizando.
 
+- --link-dest=: Establece el directorio de destino como una copia enlazada de un directorio de referencia, que en este caso es el directorio más reciente (latest) dentro de la carpeta de respaldo completa (completa). Los archivos idénticos en el directorio de origen se enlazarán en lugar de copiarse, lo que permite ahorrar espacio en el almacenamiento.
 
+- /: Especifica el directorio de origen desde el cual se sincronizarán los archivos y directorios. En este caso, se está utilizando la raíz del sistema de archivos.
 
+- $DEST_DIR/$DAY/: Indica el directorio de destino donde se guardarán los archivos y directorios sincronizados. El nombre del directorio de destino se construye utilizando el valor de la variable $DAY.
 
-### Automatizar con crontab
+### 6. Automatizar con crontab
 
+Editar nuestro archivo crontab y hacer correr cada script en su tiempo establecido:
 
-
-
-
-
-
-
-
-
-
-### Comandos
-
-rsync -ab origen/ destino/
-
-
-Esto agregará el sufijo .viejo a los archivos de respaldo, es decir, archivo01.txt será copiado en archivo01.txt.viejo, y entonces archivo01.txt sería actualizado con la nueva información. Podemos agregar la fecha de el respaldo al sufijo utilizando el comando date junto con el parámetro sufijo
-
-rsync -ab --suffix=.viejo origen/ destino/
-
-Ó
-
-rsync -ab --suffix=_`date +%F` origen/ destino/
-
-
-
---backup-dir, esto usa la carpeta en el directorio de destino, a menos que se especifique otra cosa. Si el directorio especificado no existe, rsync lo creará. Por ejemplo:
-
-rsync -ab --backup-dir=respaldo origen/ destino/
-
-
-
-
-
-## Crontab
-
-Si fuéramos a hacer un respaldo completo diario, podríamos utilizar el siguiente crontab:
-
-@daily rsync -au --delete origen/ destino/
-
-
-Para respaldo incremental:
-
-@daily rsync -ab --backup-dir=viejo_`date +%F` --delete --exclude=viejo_* origen/ destino/
-
-
-
-
-## Script
-
-creo una entrada en ~/.ssh/config como se ve en Definiendo servidores SSH, y la nombro respaldo_remoto. La entrada se ve algo así:
-
-Host respaldo_remoto
-HostName nombre_servidor.dreamhost.com
-User nombre_usuario
-
-
-me conecto por medio de SFTP, creo la carpeta .ssh, y copio mi id_rsa.pub recien generada o ya existente en .ssh/authorized_keys en el servidor remoto, y ya que estoy aquí, creo antes de salir las carpetas Respaldos y mi_trabajo que voy a utilizar:
-
-sftp respaldo_remoto
-(Escribe la contraseña. Después de entrar estamos en un shell de SFTP y usamos estos comandos)
-mkdir .ssh
-cd .ssh/
-put -p /home/juan/.ssh/id_rsa.pub authorized_keys
-cd ..
-mkdir Respaldos
-mkdir Respaldos/mi_trabajo
-exit
-
-
-nano ~/Scripts/a_respaldar.txt
-
-.vimrc
-.vim/
-Proyectos/
-Documentos/Trabajo/
-Scripts/
-
-
-touch ~/Scripts/respaldo_auto.sh
-chmod u+x ~/Scripts/respaldo_auto.sh
-
-```
-#!/bin/sh
-
-SUFIJO=$(date +%j)
-
-# Borrar el directorio en el servidor remoto vía SSH
-# ssh respaldo_remoto 'ls Respaldos/mi_trabajo/respaldo_'$SUFIJO' && rm -r Respaldos/mi_trabajo/respaldo_'$SUFIJO
-
-# Borrar el directorio en el servidor remoto vía SFTP
-sftp -b /dev/fd/0 respaldo_remoto <<EOF
-cd Respaldos/mi_trabajo
-rmdir respaldo_$SUFIJO
-exit
-EOF
-
-# Actualizar la información, creando una carpeta de respaldo e ignorando el
-# el resto de los directorios de respaldo
-rsync -ab --recursive --files-from='a_respaldar.txt' --backup-dir=respaldo_$SUFIJO --delete --filter='protect respaldo_*' /home/juan/ respaldo_remoto:Respaldos/mi_trabajo/
-```
-
-
-Probar script:
-
-sh ~/Scripts/respaldo_auto.sh
-
-
-
-editar nuestro archivo crontab y hacerlo correr el script diariamente:
-
+```bash
 crontab -e
+```
 
-@daily /home/juan/Scripts/respaldo_auto.sh
+```conf
+#Ejecutar copia completa semanalmente
+@weekly root /backup/completa.sh
 
+#Ejecutar planificación cada 4 semanas los lunes a las 23:00
+0 23 * * 1  [ $(expr $(date +\%s) / 86400 / 7 \% 4) -eq 0 ] && /backup/plan.sh
 
+#Ejecutar copia diferencial diariamente
+@daily root /backup/diff.sh
+```
 
+*La parte "[ $(($(date +%s) / (7 * 24 * 3600))) % 4 -eq 0 ]" es una verificación adicional dentro del comando cron. Divide el número de segundos transcurridos desde el 1 de enero de 1970 por el número de segundos en 4 semanas (28 días), y luego verifica si el resultado es un múltiplo de 4. Esto asegura que el script se ejecute cada 4 semanas. Pero no lo he probado para saber si es verdad que se ejecuta cada cuatro semanas.
 
+### 7. Desde Bravo, Charlie y Delta
 
+Se crearía la configuración cron y los scripts en cada máquina, pero estos últimos serían un poco diferentes ya que habría que conectarse al servidor Alfa. Habría que crear en /backup un directorio por cada servidor y realizar los mismos pasos de los script pero conectándose desde cada servidor a Alfa.
 
+Ejemplo de rsync usando ssh:
 
-## Realizar copia de seguridad automatizada con SSH
-Si realiza una copia de seguridad en un servidor remoto utilizando SSH, utilice este script en su lugar:
-
+```bash
 #!/bin/bash
 rsync -a --delete --quiet -e ssh /folder/to/backup remoteuser@remotehost:/location/of/backup
+```
 
+### 8. Restaurar cambios
 
+Si necesitáramos revertir a un respaldo previo, todo lo que necesitamos hacer es copiar de vuelta los archivos del respaldo sobre los actualizados y borrar cualquier archivo que fuera creado después de que realizamos el respaldo que estamos restaurando.
 
-## Realizar copia de seguridad diferencial por semana
-Esta es una opción útil de rsync, que consiste en realizar una copia de seguridad completa (en cada ejecución) y mantener una copia de seguridad diferencial solo de los archivos modificados en un directorio separado para cada día de la semana.
+### 9. Webs de interés
 
-Primero, cree un script que contenga las opciones de órdenes apropiadas:
+- https://wiki.archlinux.org/title/Rsync_(Espa%C3%B1ol)
+- https://web.archive.org/web/20210516191405/https://www.vicente-navarro.com/blog/2008/01/13/backups-con-rsync/
+- https://www.comoinstalarlinux.com/rsync-backup/
+- https://jumpcloud.com/blog/how-to-backup-linux-system-rsync
+- https://www.ionos.es/digitalguide/servidores/herramientas/como-crear-copias-de-seguridad-del-servidor-con-rsync/
 
-/etc/cron.daily/backup
-#!/bin/bash
+**Otras herramientas/aplicaciones interesantes para crear copias de seguridad:**
 
-DAY=$(date +%A)
-
-if [ -e /location/to/backup/incr/$DAY ] ; then
-  rm -fr /location/to/backup/incr/$DAY
-fi
-
-rsync -a --delete --quiet --inplace --backup --backup-dir=/location/to/backup/incr/$DAY /folder/to/backup/ /location/to/backup/full/
-
-
---inplace
-implica la actualización --partial de los archivos de destino en el lugar
-
-
-## Realizar copia de seguridad completa del sistema
-Esta sección trata sobre el uso de rsync para transferir una copia de todo el árbol /, excluyendo algunas carpetas seleccionadas. Se considera que este enfoque es mejor que clonar un disco con dd dado que ello utilizar un tamaño diferente, una tabla de partición y un sistema de archivos, y mejor que copiar con cp -a también, porque permite un mayor control sobre los permisos de archivos, atributos, Listas de control de acceso y Atributos extendidos.
-
-rsync funcionará incluso mientras el sistema se está ejecutando, pero los archivos modificados durante la transferencia pueden o no transferirse, lo que puede causar un comportamiento inesperado de algunos programas que usan los archivos transferidos.
-
-Este enfoque funciona bien para migrar una instalación existente a un nuevo disco duro o SSD.
-
-Ejecute la siguiente orden como root para asegurarse de que rsync pueda acceder a todos los archivos del sistema y preservar su propiedad:
-
-rsync -aAXv --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} / /path/to/backup/folder
-
-
-Al utilizar el conjunto de opciones -aAX, los archivos se transfieren en modo de comprimido, lo que garantiza que los enlaces simbólicos, los dispositivos, los permisos, las propiedades, los tiempos de modificación, los ACL y los atributos extendidos se conserven, suponiendo que el sistema de archivos de destino dé soporte a esta función.
-
-
-
-!!!!!!!!!!!!!!!!!Nota:
-Considere excluir subdirectorios sin importancia como /home/*/.thumbnails/*, /home/*/.cache/mozilla/*, /home/*/.cache/chromium/* y /home/*/.local/share/Trash/*, dependiendo del software instalado en el sistema. Si GVFS está instalado, /home/*/.gvfs debe excluirse para evitar errores de rsync.
-
-
-agregar la opción --delete de rsync si está ejecutando esto varias veces en la misma carpeta de respaldo. En este caso, asegúrese de que la ruta de origen no termine con /*, o esta opción solo tendrá efecto en los archivos dentro de los subdirectorios del directorio de origen, pero no tendrá ningún efecto en los archivos que residen directamente dentro del directorio de origen.
-
-
-Si utiliza archivos dispersos, como discos virtuales, imágenes Docker y similares, debe agregar la opción -S.
-
-
-Si planea hacer una copia de seguridad de su sistema en otro lugar que no sea /mnt o /media, no olvide agregarlo a la lista de patrones de exclusión para evitar un bucle infinito.
------ 
-En mi caso tengo que excluir el directorio /backup que es donde he montado el volumen donde se guardarán las copias de seguridad. Si no lo excluyo se creará un bucle intentando copiar lo de este fichero que no para de crecer con su propio contenido.
-
-
-
-### Restaurar cambios
-
-Si necesitáramos revertir a un respaldo previo, todo lo que necesitamos hacer es copiar de vuelta los archivos de el respaldo sobre los actualizados y borrar cualquier archivo que fuera creado después de que realizamos el respaldo que estamos restaurando.
-
-
-
-
-
-
-
-
-
-https://wiki.archlinux.org/title/Rsync_(Espa%C3%B1ol)
-https://web.archive.org/web/20210516191405/https://www.vicente-navarro.com/blog/2008/01/13/backups-con-rsync/
-https://www.comoinstalarlinux.com/rsync-backup/
-https://jumpcloud.com/blog/how-to-backup-linux-system-rsync
-
-https://www.ionos.es/digitalguide/servidores/herramientas/como-crear-copias-de-seguridad-del-servidor-con-rsync/
+- https://www.neoguias.com/mejores-aplicaciones-backup-linux/
