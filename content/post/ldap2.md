@@ -517,6 +517,13 @@ El escenario que vamo a montar sería el siguiente:
 
 ## 6. Configuración del servidor SSHD (Alfa)
 
+Instalamos el paquete sssd para que nos aparezca el comando que usaremos para buscar las claves públicas de los usuarios. Y activamos la creación automática de directorios de los usuarios si no estuviera ya configurado.
+
+```bash
+sudo apt install sssd-ldap
+sudo pam-auth-update --enable mkhomedir
+```
+
 Modificamos el fichero de configuración del servidor SSHD y añadimo lo siguiente:
 
 ```bash
@@ -539,10 +546,40 @@ Si queremos comprobar que el comando funciona correctamente podemos usarlo con u
 
 ![clave-usuario-pepito](/img/ldap2/7.png)
 
-Por último usamos el iguiente comando para que se habilite la funcionalidad de creación automática de directorio de inicio cuando los usuarios inicien sesión por primera vez.
+Por último comentar que en el servidor tengo configurado sssd de la siguiente forma.
 
 ```bash
-sudo pam-auth-update --enable mkhomedir
+sudo nano /etc/sssd/sssd.conf
+```
+
+```conf
+[domain/default]
+id_provider = ldap
+autofs_provider = ldap
+auth_provider = ldap
+chpass_provider = ldap
+ldap_uri = ldap://alfa.arantxa.gonzalonazareno.org
+ldap_search_base = dc=arantxa,dc=gonzalonazareno,dc=org
+
+#ldap_id_use_start_tls = True
+#ldap_tls_cacertdir = /etc/openldap/cacerts
+cache_credentials = True
+#ldap_tls_reqcert = allow
+debug_level = 10
+
+[sssd]
+services = nss, pam, autofs, ssh
+domains = default
+debug_level = 6
+
+[ssh]
+debug_level = 8
+```
+
+```bash
+sudo chmod 0600 /etc/sssd/sssd.conf
+sudo systemctl restart sssd
+sudo systemctl status sssd
 ```
 
 ## 7. Configuracion del cliente LDAP, SSH y SSSD (en Bravo)
