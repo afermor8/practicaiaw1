@@ -398,6 +398,7 @@ Si necesitáramos revertir a un respaldo previo, todo lo que necesitamos hacer e
 - https://www.comoinstalarlinux.com/rsync-backup/
 - https://jumpcloud.com/blog/how-to-backup-linux-system-rsync
 - https://www.ionos.es/digitalguide/servidores/herramientas/como-crear-copias-de-seguridad-del-servidor-con-rsync/
+- https://github.com/Pricetx/backup/blob/master/backup.sh
 
 **Otras herramientas/aplicaciones interesantes para crear copias de seguridad:**
 
